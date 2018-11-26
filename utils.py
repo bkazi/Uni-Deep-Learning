@@ -22,4 +22,7 @@ def get_data():
     train_set_data = np.array(map(lambda x: melspectrogram(x)[
                               :, :, np.newaxis], train_set["data"]))
     train_set_labels = np.eye(FLAGS.num_classes)[train_set["labels"]]
-    return (train_set_data, train_set_labels)
+    test_set_data = np.array(map(lambda x: melspectrogram(x)[
+                             :, :, np.newaxis], test_set["data"]))
+    test_set_labels = np.eye(FLAGS.num_classes)[test_set["labels"]]
+    return (train_set_data, train_set_labels, test_set_data, test_set_labels)
