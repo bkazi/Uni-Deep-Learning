@@ -14,7 +14,7 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_integer('max-steps', 100,
                             'Number of mini-batches to train on. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('log-frequency', 500,
+tf.app.flags.DEFINE_integer('log-frequency', 100,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 tf.app.flags.DEFINE_integer('save-model', 1000,
                             'Number of steps between model saves (default: %(default)d)')
@@ -54,8 +54,14 @@ def main(_):
         cross_entropy = tf.reduce_mean(
             tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=y_out))
 
+    l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.0001, scope=None)
+    weights = tf.trainable_variables()
+    regularization_penalty = tf.contrib.layers.apply_regularization(
+        l1_regularizer, weights)
+    regularized_loss = cross_entropy + regularization_penalty
+
     optimiser = tf.train.AdamOptimizer(
-        FLAGS.learning_rate, name="AdamOpt").minimize(cross_entropy)
+        FLAGS.learning_rate, name="AdamOpt").minimize(regularized_loss)
 
     correct_prediction = tf.equal(
         tf.argmax(y, axis=1), tf.argmax(y_out, axis=1))

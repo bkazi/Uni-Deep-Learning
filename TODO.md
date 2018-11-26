@@ -1,7 +1,7 @@
 - [x] batch into correct number of batches (currently 16 batches instead of 16 per batch)
 - [x] use actual testing data in testing
+- [x] L1 regularise loss
 - [ ] move batching logic out of main file
-- [ ] L1 regularise loss
 - [ ] write summaries
 - [ ] compute other evaluation metrics
 - [ ] imlpement deep network
