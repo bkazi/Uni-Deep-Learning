@@ -7,12 +7,12 @@ import os
 import numpy as np
 import tensorflow as tf
 
-from utils import get_data
+from utils import get_data, MusicGenreDataset
 from shallow_nn import shallow_nn
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer('max-steps', 100,
+tf.app.flags.DEFINE_integer('epochs', 100,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('log-frequency', 100,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
@@ -43,6 +43,7 @@ run_log_dir = os.path.join(FLAGS.log_dir,
 
 def main(_):
 
+    # Define TensorFlow placeholders for input and output
     with tf.variable_scope('inputs'):
         x = tf.placeholder(
             tf.float32, [None, FLAGS.input_width, FLAGS.input_height, FLAGS.input_channels])
@@ -50,16 +51,20 @@ def main(_):
 
     y_out = shallow_nn(x)
 
+    # Compute categorical loss
     with tf.variable_scope('cross_entropy'):
         cross_entropy = tf.reduce_mean(
             tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=y_out))
 
+    # L1 regularise
     l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.0001, scope=None)
     weights = tf.trainable_variables()
     regularization_penalty = tf.contrib.layers.apply_regularization(
         l1_regularizer, weights)
     regularized_loss = cross_entropy + regularization_penalty
 
+    # Adam Optimiser
+    # default values match that in paper
     optimiser = tf.train.AdamOptimizer(
         FLAGS.learning_rate, name="AdamOpt").minimize(regularized_loss)
 
@@ -67,31 +72,9 @@ def main(_):
         tf.argmax(y, axis=1), tf.argmax(y_out, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-    train_data, train_labels, test_data, test_labels = get_data()
+    dataset = MusicGenreDataset()
 
-    train_data_tf = tf.constant(train_data)
-    train_labels_tf = tf.constant(train_labels)
-    test_data_tf = tf.constant(test_data)
-    test_labels_tf = tf.constant(test_labels)
-
-    train_data_batch_op, train_labels_batch_op = tf.train.shuffle_batch(
-        [train_data_tf, train_labels_tf],
-        enqueue_many=True,
-        batch_size=FLAGS.batch_size,
-        capacity=len(train_data),
-        min_after_dequeue=FLAGS.batch_size,
-        allow_smaller_final_batch=True
-    )
-    test_data_batch_op, test_labels_batch_op = tf.train.shuffle_batch(
-        [test_data_tf, test_labels_tf],
-        enqueue_many=True,
-        batch_size=FLAGS.batch_size,
-        capacity=len(test_data),
-        min_after_dequeue=FLAGS.batch_size,
-        allow_smaller_final_batch=True
-    )
-
-    num_batches = int(len(train_data) / FLAGS.batch_size)
+    num_batches = int(dataset.train_data_size / FLAGS.batch_size)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -99,18 +82,20 @@ def main(_):
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord)
 
-        for epoch in range(FLAGS.max_steps):
+        # Training loop
+        # Loop over the entire training set and all batches in training set
+        for epoch in range(FLAGS.epochs):
             for i in range(num_batches):
                 step = epoch * num_batches + i
 
-                train_data_batch, train_labels_batch = sess.run(
-                    [train_data_batch_op, train_labels_batch_op])
+                train_data_batch, train_labels_batch = dataset.getTrainBatch(
+                    sess)
                 sess.run(optimiser, feed_dict={
                     x: train_data_batch, y: train_labels_batch})
 
                 if step % FLAGS.log_frequency == 0:
-                    test_data_batch, test_labels_batch = sess.run(
-                        [test_data_batch_op, test_labels_batch_op])
+                    test_data_batch, test_labels_batch = dataset.getTestBatch(
+                        sess)
                     validation_accuracy = sess.run(
                         accuracy, feed_dict={x: test_data_batch, y: test_labels_batch})
                     print('step %d, accuracy on validation batch: %g' %

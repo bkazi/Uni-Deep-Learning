@@ -1,8 +1,9 @@
 - [x] batch into correct number of batches (currently 16 batches instead of 16 per batch)
 - [x] use actual testing data in testing
 - [x] L1 regularise loss
-- [ ] move batching logic out of main file
+- [x] move batching logic out of main file
 - [ ] write summaries
+- [ ] evaluate over entire data set
 - [ ] compute other evaluation metrics
 - [ ] imlpement deep network
 - [ ] figure out how to nicely switch between different architectures and epoch numbers (using flags)
