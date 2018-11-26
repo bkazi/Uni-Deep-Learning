@@ -1,0 +1,8 @@
+- [ ] move batching logic out of main file
+- [ ] use actual testing data in testing
+- [ ] L1 regularise loss
+- [ ] write summaries
+- [ ] compute other evaluation metrics
+- [ ] imlpement deep network
+- [ ] figure out how to nicely switch between different architectures and epoch numbers (using flags)
+- [ ] start data augmentation
