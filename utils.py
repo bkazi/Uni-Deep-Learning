@@ -19,7 +19,7 @@ def get_data():
         train_set = pickle.load(f)
         test_set = pickle.load(f)
 
-    train_set_data = map(lambda x: np.array(
-        melspectrogram(x)), train_set["data"])
+    train_set_data = np.array(map(lambda x: melspectrogram(x)[
+                              :, :, np.newaxis], train_set["data"]))
     train_set_labels = np.eye(FLAGS.num_classes)[train_set["labels"]]
     return (train_set_data, train_set_labels)
