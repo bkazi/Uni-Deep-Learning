@@ -1,3 +1,4 @@
+- [ ] batch into correct number of batches (currently 16 batches instead of 16 per batch)
 - [ ] move batching logic out of main file
 - [ ] use actual testing data in testing
 - [ ] L1 regularise loss
