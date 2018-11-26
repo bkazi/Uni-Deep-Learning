@@ -14,7 +14,7 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_integer('max-steps', 100,
                             'Number of mini-batches to train on. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('log-frequency', 10,
+tf.app.flags.DEFINE_integer('log-frequency', 500,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 tf.app.flags.DEFINE_integer('save-model', 1000,
                             'Number of steps between model saves (default: %(default)d)')
@@ -61,32 +61,57 @@ def main(_):
         tf.argmax(y, axis=1), tf.argmax(y_out, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-    train_data, train_labels = get_data()
+    train_data, train_labels, test_data, test_labels = get_data()
+
+    train_data_tf = tf.constant(train_data)
+    train_labels_tf = tf.constant(train_labels)
+    test_data_tf = tf.constant(test_data)
+    test_labels_tf = tf.constant(test_labels)
+
+    train_data_batch_op, train_labels_batch_op = tf.train.shuffle_batch(
+        [train_data_tf, train_labels_tf],
+        enqueue_many=True,
+        batch_size=FLAGS.batch_size,
+        capacity=len(train_data),
+        min_after_dequeue=FLAGS.batch_size,
+        allow_smaller_final_batch=True
+    )
+    test_data_batch_op, test_labels_batch_op = tf.train.shuffle_batch(
+        [test_data_tf, test_labels_tf],
+        enqueue_many=True,
+        batch_size=FLAGS.batch_size,
+        capacity=len(test_data),
+        min_after_dequeue=FLAGS.batch_size,
+        allow_smaller_final_batch=True
+    )
+
+    num_batches = int(len(train_data) / FLAGS.batch_size)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(coord=coord)
+
         for epoch in range(FLAGS.max_steps):
+            for i in range(num_batches):
+                step = epoch * num_batches + i
 
-            permutation = np.random.permutation(len(train_data))
-            shuffled_train_data = train_data[permutation]
-            shuffled_train_labels = train_labels[permutation]
-            train_data_batched = np.array_split(
-                shuffled_train_data, FLAGS.batch_size)
-            train_labels_batched = np.array_split(
-                shuffled_train_labels, FLAGS.batch_size)
-
-            for i, batch in enumerate(train_data_batched):
-                step = epoch * len(train_data_batched) + i
-
+                train_data_batch, train_labels_batch = sess.run(
+                    [train_data_batch_op, train_labels_batch_op])
                 sess.run(optimiser, feed_dict={
-                    x: batch, y: train_labels_batched[i]})
+                    x: train_data_batch, y: train_labels_batch})
 
                 if step % FLAGS.log_frequency == 0:
+                    test_data_batch, test_labels_batch = sess.run(
+                        [test_data_batch_op, test_labels_batch_op])
                     validation_accuracy = sess.run(
-                        accuracy, feed_dict={x: batch, y: train_labels_batched[i]})
+                        accuracy, feed_dict={x: test_data_batch, y: test_labels_batch})
                     print('step %d, accuracy on validation batch: %g' %
                           (step, validation_accuracy))
+
+        coord.request_stop()
+        coord.join(threads)
 
 
 if __name__ == '__main__':
