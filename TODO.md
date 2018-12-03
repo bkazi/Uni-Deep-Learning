@@ -2,6 +2,7 @@
 - [x] use actual testing data in testing
 - [x] L1 regularise loss
 - [x] move batching logic out of main file
+- [ ] use new TF APIs (stuff that isn't deprecated)
 - [ ] write summaries
 - [ ] evaluate over entire data set
 - [ ] compute other evaluation metrics

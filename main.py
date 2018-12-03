@@ -14,25 +14,25 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_integer('epochs', 100,
                             'Number of mini-batches to train on. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('log-frequency', 100,
+tf.app.flags.DEFINE_integer('log_frequency', 100,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
-tf.app.flags.DEFINE_integer('save-model', 1000,
+tf.app.flags.DEFINE_integer('save_model', 1000,
                             'Number of steps between model saves (default: %(default)d)')
 
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer(
-    'batch-size', 16, 'Number of examples per mini-batch (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning-rate', 5e-5,
+    'batch_size', 16, 'Number of examples per mini-batch (default: %(default)d)')
+tf.app.flags.DEFINE_float('learning_rate', 5e-5,
                           'Learning rate (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
-    'input-width', 80, 'Input width (default: %(default)d)')
+    'input_width', 80, 'Input width (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
-    'input-height', 80, 'Input height (default: %(default)d)')
+    'input_height', 80, 'Input height (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
-    'input-channels', 1, 'Input channels (default: %(default)d)')
+    'input_channels', 1, 'Input channels (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
-    'num-classes', 10, 'Number of classes (default: %(default)d)')
-tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
+    'num_classes', 10, 'Number of classes (default: %(default)d)')
+tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
                            'Directory where to write event logs and checkpoint. (default: %(default)s)')
 
 
