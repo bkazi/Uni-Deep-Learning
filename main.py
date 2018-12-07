@@ -41,68 +41,94 @@ run_log_dir = os.path.join(FLAGS.log_dir,
                                                         lr=FLAGS.learning_rate))
 
 
-def main(_):
+def model(iterator):
+    next_x, next_y = iterator.get_next()
 
-    # Define TensorFlow placeholders for input and output
-    with tf.variable_scope('inputs'):
-        x = tf.placeholder(
-            tf.float32, [None, FLAGS.input_width, FLAGS.input_height, FLAGS.input_channels])
-        y = tf.placeholder(tf.float32, [None, FLAGS.num_classes])
-
-    y_out = shallow_nn(x)
+    with tf.variable_scope('Model', reuse=tf.AUTO_REUSE):
+        y_out = shallow_nn(next_x)
 
     # Compute categorical loss
     with tf.variable_scope('cross_entropy'):
         cross_entropy = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=y_out))
+            tf.nn.softmax_cross_entropy_with_logits_v2(labels=next_y, logits=y_out))
 
     # L1 regularise
-    l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.0001, scope=None)
-    weights = tf.trainable_variables()
-    regularization_penalty = tf.contrib.layers.apply_regularization(
-        l1_regularizer, weights)
+    regularization_penalty = tf.losses.get_regularization_loss(
+        scope=None, name='total_regularization_loss')
     regularized_loss = cross_entropy + regularization_penalty
+
+    return regularized_loss
+
+
+def calc_accuracy(iterator):
+    next_x, next_y = iterator.get_next()
+
+    with tf.variable_scope('Model', reuse=tf.AUTO_REUSE):
+        y_out = shallow_nn(next_x)
+
+    correct_prediction = tf.equal(
+        tf.argmax(next_y, axis=1), tf.argmax(y_out, axis=1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+    return accuracy
+
+
+def main(_):
+
+    (train_set_data, train_set_labels, test_set_data, test_set_labels) = get_data()
+
+    features_placeholder = tf.placeholder(
+        train_set_data.dtype, train_set_data.shape)
+    labels_placeholder = tf.placeholder(
+        train_set_labels.dtype, train_set_labels.shape)
+
+    dataset = tf.data.Dataset.from_tensor_slices(
+        (features_placeholder, labels_placeholder))
+    dataset = dataset.shuffle(buffer_size=1000)
+    dataset = dataset.batch(FLAGS.batch_size)
+    train_iterator = dataset.make_initializable_iterator()
+
+    test_features_placeholder = tf.placeholder(
+        test_set_data.dtype, test_set_data.shape)
+    test_labels_placeholder = tf.placeholder(
+        test_set_labels.dtype, test_set_labels.shape)
+
+    dataset = tf.data.Dataset.from_tensor_slices(
+        (test_features_placeholder, test_labels_placeholder))
+    dataset = dataset.batch(FLAGS.batch_size)
+    test_iterator = dataset.make_initializable_iterator()
+
+    loss = model(train_iterator)
 
     # Adam Optimiser
     # default values match that in paper
     optimiser = tf.train.AdamOptimizer(
-        FLAGS.learning_rate, name="AdamOpt").minimize(regularized_loss)
+        FLAGS.learning_rate, name="AdamOpt").minimize(loss)
 
-    correct_prediction = tf.equal(
-        tf.argmax(y, axis=1), tf.argmax(y_out, axis=1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-    dataset = MusicGenreDataset()
-
-    num_batches = int(dataset.train_data_size / FLAGS.batch_size)
+    validation_accuracy = calc_accuracy(test_iterator)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(coord=coord)
+        for epoch in range(100):
+            sess.run(train_iterator.initializer, feed_dict={
+                features_placeholder: train_set_data, labels_placeholder: train_set_labels})
+            while True:
+                try:
+                    sess.run(optimiser)
+                except tf.errors.OutOfRangeError:
+                    break
 
-        # Training loop
-        # Loop over the entire training set and all batches in training set
-        for epoch in range(FLAGS.epochs):
-            for i in range(num_batches):
-                step = epoch * num_batches + i
-
-                train_data_batch, train_labels_batch = dataset.getTrainBatch(
-                    sess)
-                sess.run(optimiser, feed_dict={
-                    x: train_data_batch, y: train_labels_batch})
-
-                if step % FLAGS.log_frequency == 0:
-                    test_data_batch, test_labels_batch = dataset.getTestBatch(
-                        sess)
-                    validation_accuracy = sess.run(
-                        accuracy, feed_dict={x: test_data_batch, y: test_labels_batch})
-                    print('step %d, accuracy on validation batch: %g' %
-                          (step, validation_accuracy))
-
-        coord.request_stop()
-        coord.join(threads)
+            sess.run(test_iterator.initializer, feed_dict={
+                test_features_placeholder: test_set_data, test_labels_placeholder: test_set_labels})
+            accuracies = []
+            while True:
+                try:
+                    accuracies.append(sess.run(validation_accuracy))
+                except tf.errors.OutOfRangeError:
+                    break
+            print("Validation accuracy on epoch " +
+                  str(epoch) + ": ", np.mean(accuracies))
 
 
 if __name__ == '__main__':

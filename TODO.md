@@ -2,10 +2,11 @@
 - [x] use actual testing data in testing
 - [x] L1 regularise loss
 - [x] move batching logic out of main file
-- [ ] use new TF APIs (stuff that isn't deprecated)
+- [x] use new TF APIs (stuff that isn't deprecated)
+- [ ] process data per batch (Bilal)
 - [ ] write summaries
-- [ ] evaluate over entire data set
-- [ ] compute other evaluation metrics
+- [x] evaluate over entire data set
+- [ ] compute other evaluation metrics (Greg)
 - [ ] imlpement deep network
 - [ ] figure out how to nicely switch between different architectures and epoch numbers (using flags)
 - [ ] start data augmentation
