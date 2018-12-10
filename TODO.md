@@ -4,7 +4,7 @@
 - [x] move batching logic out of main file
 - [x] use new TF APIs (stuff that isn't deprecated)
 - [ ] process data per batch (Bilal)
-- [ ] write summaries
+- [X] write summaries
 - [x] evaluate over entire data set
 - [ ] compute other evaluation metrics (Greg)
 - [ ] imlpement deep network
