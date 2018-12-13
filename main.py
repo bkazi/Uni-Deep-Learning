@@ -75,7 +75,8 @@ def calc_accuracy(iterator):
 
 def main(_):
 
-    (train_set_data, train_set_labels, test_set_data, test_set_labels) = get_data()
+    (train_set_data, train_set_labels, _, test_set_data,
+     test_set_labels, test_set_track_ids) = get_data()
 
     features_placeholder = tf.placeholder(
         train_set_data.dtype, train_set_data.shape)
@@ -107,44 +108,47 @@ def main(_):
 
     validation_accuracy = calc_accuracy(test_iterator)
 
-    
-    loss_summary = tf.summary.scalar('Loss', loss);
-    acc_summary  = tf.summary.scalar('Accuracy', validation_accuracy);
-
+    loss_summary = tf.summary.scalar('Loss', loss)
+    acc_summary = tf.summary.scalar('Accuracy', validation_accuracy)
 
     with tf.Session() as sess:
 
-        summary_writer = tf.summary.FileWriter(run_log_dir + 'train', sess.graph)
-        summary_writer_validation = tf.summary.FileWriter(run_log_dir+'_validate', sess.graph)
-        
-        sess.run(tf.global_variables_initializer())
+        summary_writer = tf.summary.FileWriter(
+            run_log_dir + 'train', sess.graph)
+        summary_writer_validation = tf.summary.FileWriter(
+            run_log_dir+'_validate', sess.graph)
 
+        sess.run(tf.global_variables_initializer())
 
         for epoch in range(100):
             sess.run(train_iterator.initializer, feed_dict={
                 features_placeholder: train_set_data, labels_placeholder: train_set_labels})
             while True:
-                try: 
-                    _, summary_str = sess.run([optimiser, loss_summary]) # Run until all samples done
+                try:
+                    # Run until all samples done
+                    _, summary_str = sess.run([optimiser, loss_summary])
                 except tf.errors.OutOfRangeError:
                     break
 
-            summary_writer.add_summary(summary_str, epoch);
+            summary_writer.add_summary(summary_str, epoch)
 
             sess.run(test_iterator.initializer, feed_dict={
                 test_features_placeholder: test_set_data, test_labels_placeholder: test_set_labels})
             accuracies = []
             while True:
                 try:
-                    temp_acc, acc_summary_str = sess.run([validation_accuracy, acc_summary])
+                    temp_acc, acc_summary_str = sess.run(
+                        [validation_accuracy, acc_summary])
                     accuracies.append(temp_acc)
                 except tf.errors.OutOfRangeError:
                     break
-                    
-            summary_writer_validation.add_summary(acc_summary_str, epoch);
+
+            summary_writer_validation.add_summary(acc_summary_str, epoch)
 
             print("Validation accuracy on epoch " +
                   str(epoch) + ": ", np.mean(accuracies))
+
+        print("-----===== Summary =====-----")
 
 
 if __name__ == '__main__':
