@@ -26,6 +26,7 @@ else
 fi
 
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  sudo apt install inotify-tools
   echo "Done"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
   brew update
