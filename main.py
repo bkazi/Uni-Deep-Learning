@@ -178,7 +178,12 @@ def main(_):
             except tf.errors.OutOfRangeError:
                 break
         
-        evaluate(results)
+        raw_probability, maximum_probability, majority_vote = evaluate(results)
+
+        print("-----===== Summary =====-----")
+        print("Raw Probability: ", raw_probability)
+        print("Maximum Probability: ", maximum_probability)
+        print("Majority Vote: ", majority_vote)
 
 
 if __name__ == '__main__':

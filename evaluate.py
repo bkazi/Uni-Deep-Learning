@@ -52,8 +52,5 @@ def evaluate(results):
         track_prediction = np.eye(FLAGS.num_classes)[np.argmax(reduce((lambda x, y: np.add(x, y)), predictions))]
         majority_vote.append(int(np.array_equal(truth, track_prediction)))
         
+    return (np.mean(raw_probability), np.mean(maximum_probability), np.mean(majority_vote))
     
-    print("-----===== Summary =====-----")
-    print("Raw Probability: ", np.mean(raw_probability))
-    print("Maximum Probability: ", np.mean(maximum_probability))
-    print("Majority Vote: ", np.mean(majority_vote))
