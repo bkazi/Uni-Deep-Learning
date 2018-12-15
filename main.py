@@ -13,7 +13,7 @@ from shallow_nn import shallow_nn
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer('epochs', 3,
+tf.app.flags.DEFINE_integer('epochs', 100,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('log_frequency', 100,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
@@ -81,10 +81,21 @@ def evaluate(iterator, nn):
 
     return (x, y, y_out, i)
 
+'''
+    Softmax for just numpy
+'''
 def np_softmax(w, t = 1.0):
     e = np.exp(np.array(w) / t)
     dist = e / np.sum(e)
     return dist
+
+'''
+    Functional list extend - WHY DO LANGUAGES INSIST ON MUTATION
+'''
+def f_extend(list1, list2):
+    newlist = list(list1)
+    newlist.extend(list2)
+    return newlist
 
 def main(_):
 
@@ -184,7 +195,7 @@ def main(_):
         majority_vote = []
 
         track_truth = {}
-        track_softmax = {}
+        track_softmaxs = {}
         track_predictions = {}
 
         for result in results:
@@ -195,18 +206,15 @@ def main(_):
             i = result[3][0]
 
             track_truth[i] = y
-            track_softmax[i] = track_softmax.get(i, []) + [y_out_softmax] # Bug here sometimes plus wants to be numeric
-            track_predictions[i] = track_predictions.get(i, []) + [y_out_prediction]
+            track_softmaxs[i] = f_extend(track_softmaxs.get(i, []), [y_out_softmax]) # Bug here sometimes plus wants to be numeric
+            track_predictions[i] = f_extend(track_predictions.get(i, []), [y_out_prediction])
 
             raw_probability.append(int(np.array_equal(y, y_out_prediction)))
 
-        for i in track_softmax:
+        for i in track_truth:
             truth = track_truth[i]
-            softmaxs = track_softmax[i]
+            softmaxs = track_softmaxs[i]
             predictions = track_predictions[i]
-
-            print("i: ", i)
-            print("Softmaxs: ", softmaxs)
 
             track_softmax = np_softmax(reduce((lambda x, y: np.add(x, y)), softmaxs))
             maximum_probability.append(int(np.array_equal(truth, np.eye(FLAGS.num_classes)[np.argmax(track_softmax)])))
