@@ -1,4 +1,5 @@
 import tensorflow as tf
+from utils import tf_melspectogram
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -7,7 +8,7 @@ def activation_func(x):
     return tf.nn.leaky_relu(x, alpha=0.3)
 
 
-def shallow_nn(x):
+def shallow_nn(x, is_training):
     """shallow_nn builds the graph for a shallow net for classifying music genres.
   Args:
       x: an input tensor with the dimensions (N_examples, 6400), is the number of data points in the spectral space
@@ -17,6 +18,7 @@ def shallow_nn(x):
         (blues, classical, country, disco, hiphop, jazz, metal, pop, reggae, rock)
     """
     l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.0001)
+    x = tf_melspectogram(x)
 
     # Frequency
     with tf.variable_scope('Layer1_Freq'):
@@ -27,8 +29,10 @@ def shallow_nn(x):
             strides=(1, 1),
             padding="same",
             activation=activation_func,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
-            use_bias=False,
+            bias_regularizer=l1_regularizer,
             name='fconv'
         )
         fpool = tf.layers.max_pooling2d(
@@ -48,8 +52,10 @@ def shallow_nn(x):
             strides=(1, 1),
             padding="same",
             activation=activation_func,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
-            use_bias=False,
+            bias_regularizer=l1_regularizer,
             name='tconv'
         )
         tpool = tf.layers.max_pooling2d(
@@ -59,19 +65,22 @@ def shallow_nn(x):
             strides=(20, 1),
             name='tpool'
         )
-        tflat = tf.contrib.layers.flatten(tpool)
+        tflat = tf.layers.flatten(tpool)
 
     concat = tf.concat([fflat, tflat], 1)
 
     with tf.variable_scope('Fully_Connected'):
         drop = tf.layers.dropout(
             inputs=concat,
-            rate=0.1
+            rate=0.1,
+            training=is_training
         )
         fc1 = tf.layers.dense(
             inputs=drop,
             units=200,
-            activation=None,
+            activation=activation_func,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             name='fc1'
@@ -79,6 +88,8 @@ def shallow_nn(x):
         fc2 = tf.layers.dense(
             inputs=fc1,
             units=FLAGS.num_classes,
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             activation=None,
