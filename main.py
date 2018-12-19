@@ -26,7 +26,7 @@ tf.app.flags.DEFINE_integer('save_model', 1000,
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer(
     'batch_size', 16, 'Number of examples per mini-batch (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning_rate', 5e-5,
+tf.app.flags.DEFINE_float('learning_rate', 0.00005,
                           'Learning rate (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'input_width', 80, 'Input width (default: %(default)d)')
@@ -77,11 +77,11 @@ def calc_accuracy(iterator, is_training, nn):
     return accuracy
 
 
-def accumulate_results(iterator, nn):
+def accumulate_results(iterator, is_training, nn):
     x, y, i = iterator.get_next()
 
     with tf.variable_scope('Model', reuse=tf.AUTO_REUSE):
-        y_out = nn(x)
+        y_out = nn(x, is_training)
 
     return (x, y, y_out, i)
 
@@ -116,6 +116,8 @@ def main(_):
 
     eval_dataset = tf.data.Dataset.from_tensor_slices(
         (features_placeholder, labels_placeholder, track_ids_placeholder))
+    eval_dataset = eval_dataset.map(lambda features, label, track_id: (
+        features, tf.one_hot(indices=label, depth=FLAGS.num_classes, dtype=tf.uint8), track_id))
     eval_dataset = eval_dataset.batch(1)
     eval_iterator = eval_dataset.make_initializable_iterator()
 
@@ -143,7 +145,7 @@ def main(_):
 
         num_train_batches = round(len(train_set_data) / FLAGS.batch_size)
         num_test_batches = round(len(test_set_data) / FLAGS.batch_size)
-        for epoch in range(100):
+        for epoch in range(FLAGS.epochs):
             sess.run(train_iterator.initializer, feed_dict={
                 features_placeholder: train_set_data, labels_placeholder: train_set_labels})
 
@@ -177,9 +179,10 @@ def main(_):
             print("Validation accuracy after epoch " +
                   str(epoch) + ": ", np.mean(accuracies))
 
-        evaluator = accumulate_results(eval_iterator, shallow_nn)
-        sess.run(eval_iterator.initializer, feed_dict={features_placeholder: test_set_data,
-                                                       labels_placeholder: test_set_labels, track_ids_placeholder: test_set_track_ids})
+        evaluator = accumulate_results(
+            eval_iterator, is_training_placeholder, shallow_nn)
+        sess.run(eval_iterator.initializer, feed_dict={
+                 features_placeholder: test_set_data, labels_placeholder: test_set_labels, track_ids_placeholder: test_set_track_ids})
 
         results = []
 
