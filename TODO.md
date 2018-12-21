@@ -3,10 +3,10 @@
 - [x] L1 regularise loss
 - [x] move batching logic out of main file
 - [x] use new TF APIs (stuff that isn't deprecated)
-- [ ] process data per batch (Bilal)
-- [X] write summaries
+- [x] process data per batch (Bilal)
+- [x] write summaries (Sunny)
 - [x] evaluate over entire data set
 - [ ] compute other evaluation metrics (Greg)
-- [ ] imlpement deep network
+- [x] implement deep network (Bilal)
 - [ ] figure out how to nicely switch between different architectures and epoch numbers (using flags)
 - [ ] start data augmentation

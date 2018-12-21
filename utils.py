@@ -14,65 +14,37 @@ def melspectrogram(audio):
     return np.log(mel_spec + 1e-6)
 
 
+def tf_melspectogram(audio):
+    sample_rate = 22050
+    spec = tf.contrib.signal.stft(
+        audio, frame_length=512, frame_step=256, fft_length=512, pad_end=True)
+    mag_spec = tf.abs(spec)
+    num_spectrogram_bins = mag_spec.shape[-1].value
+    num_mel_bins, lower_edge_hertz, upper_edge_hertz = 80, 0, sample_rate/2
+    mel_basis = tf.contrib.signal.linear_to_mel_weight_matrix(
+        num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz, upper_edge_hertz)
+    mel_spec = tf.tensordot(mag_spec, mel_basis, 1)
+    mel_spec.set_shape(
+        mag_spec.shape[:-1].concatenate(mel_basis.shape[-1:]))
+    mel_spec = tf.expand_dims(mel_spec, -1)
+    return tf.log(mel_spec + 1e-6)
+
+
+def preprocess_py_func(features, label):
+    transformed = melspectrogram(features)[:, :, np.newaxis]
+    transformed = transformed.astype('float32')
+    return transformed, label
+
+
 def get_data():
     with open('music_genres_dataset.pkl', 'rb') as f:
         train_set = pickle.load(f)
         test_set = pickle.load(f)
 
-    train_set_data = np.array(map(lambda x: melspectrogram(x)[
-                              :, :, np.newaxis], train_set["data"]))
-    train_set_labels = np.eye(FLAGS.num_classes)[train_set["labels"]]
-    test_set_data = np.array(map(lambda x: melspectrogram(x)[
-                             :, :, np.newaxis], test_set["data"]))
-    test_set_labels = np.eye(FLAGS.num_classes)[test_set["labels"]]
-    return (train_set_data, train_set_labels, test_set_data, test_set_labels)
-
-
-class MusicGenreDataset:
-    def __init__(self):
-        with open('music_genres_dataset.pkl', 'rb') as f:
-            self.train_set = pickle.load(f)
-            self.test_set = pickle.load(f)
-
-        self.train_data_size = len(self.train_set["data"])
-        self.test_data_size = len(self.test_set["data"])
-
-        train_data = np.array(map(lambda x: melspectrogram(x)[
-                              :, :, np.newaxis], self.train_set["data"]))
-        train_labels = np.eye(FLAGS.num_classes)[self.train_set["labels"]]
-        test_data = np.array(map(lambda x: melspectrogram(x)[
-            :, :, np.newaxis], self.test_set["data"]))
-        test_labels = np.eye(FLAGS.num_classes)[self.test_set["labels"]]
-
-        train_data_tf = tf.constant(train_data)
-        train_labels_tf = tf.constant(train_labels)
-        test_data_tf = tf.constant(test_data)
-        test_labels_tf = tf.constant(test_labels)
-
-        NUM_THREADS = 4
-
-        self.train_data_batch_op, self.train_labels_batch_op = tf.train.shuffle_batch(
-            [train_data_tf, train_labels_tf],
-            enqueue_many=True,
-            batch_size=FLAGS.batch_size,
-            capacity=len(train_data) / 2,
-            min_after_dequeue=FLAGS.batch_size,
-            allow_smaller_final_batch=True,
-            num_threads=NUM_THREADS
-        )
-
-        self.test_data_batch_op, self.test_labels_batch_op = tf.train.shuffle_batch(
-            [test_data_tf, test_labels_tf],
-            enqueue_many=True,
-            batch_size=FLAGS.batch_size,
-            capacity=len(test_data) / 2,
-            min_after_dequeue=FLAGS.batch_size,
-            allow_smaller_final_batch=True,
-            num_threads=NUM_THREADS
-        )
-
-    def getTrainBatch(self, sess):
-        return sess.run([self.train_data_batch_op, self.train_labels_batch_op])
-
-    def getTestBatch(self, sess):
-        return sess.run([self.test_data_batch_op, self.test_labels_batch_op])
+    train_set_data = train_set["data"]
+    train_set_labels = train_set["labels"]
+    train_set_track_ids = train_set["track_id"]
+    test_set_data = test_set["data"]
+    test_set_labels = test_set["labels"]
+    test_set_track_ids = test_set["track_id"]
+    return (train_set_data, train_set_labels, train_set_track_ids, test_set_data, test_set_labels, test_set_track_ids)
