@@ -2,8 +2,11 @@ import pickle
 import librosa
 import numpy as np
 import tensorflow as tf
+import itertools
+
 
 FLAGS = tf.app.flags.FLAGS
+SAMPLING_RATE = 22050
 
 
 def melspectrogram(audio):
@@ -15,14 +18,13 @@ def melspectrogram(audio):
 
 
 def tf_melspectogram(audio):
-    sample_rate = 22050
     spec = tf.contrib.signal.stft(
         audio, frame_length=512, frame_step=256, fft_length=512, pad_end=True)
     mag_spec = tf.abs(spec)
     num_spectrogram_bins = mag_spec.shape[-1].value
-    num_mel_bins, lower_edge_hertz, upper_edge_hertz = 80, 0, sample_rate/2
+    num_mel_bins, lower_edge_hertz, upper_edge_hertz = 80, 0, SAMPLING_RATE/2
     mel_basis = tf.contrib.signal.linear_to_mel_weight_matrix(
-        num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz, upper_edge_hertz)
+        num_mel_bins, num_spectrogram_bins, SAMPLING_RATE, lower_edge_hertz, upper_edge_hertz)
     mel_spec = tf.tensordot(mag_spec, mel_basis, 1)
     mel_spec.set_shape(
         mag_spec.shape[:-1].concatenate(mel_basis.shape[-1:]))
@@ -35,6 +37,22 @@ def preprocess_py_func(features, label):
     transformed = transformed.astype('float32')
     return transformed, label
 
+
+
+def augmentFunctions(features, params):
+    timeStretched = librosa.effects.time_stretch(features, params[0])
+    pitchShifted = librosa.effects.pitch_shift(timeStretched, SAMPLING_RATE, params[1])
+
+    return pitchShifted
+
+def dataAugmentation(features):
+    timeStretchValues = [1.2, 1.5, 0.5, 0.2]
+    pitchShifting = [-2, -5, 2, 5]
+
+    combinations = itertools.product(timeStretchValues, pitchShifting)
+    augmentedData = map(lambda x: augmentFunctions(features, x), combinations)
+
+    return augmentedData
 
 def get_data():
     with open('music_genres_dataset.pkl', 'rb') as f:
