@@ -86,21 +86,8 @@ def calc_accuracy(iterator, is_training):
     return accuracy
 
 
-def tf_dataAug(features):
-    return tf.py_func(dataAugmentation, [features], [tf.float32])
-
-
 def _preprocess(features, label):
     label = tf.one_hot(indices=label, depth=FLAGS.num_classes, dtype=tf.uint8)
-
-    # # 1 in 5 chance
-    # randNum = tf.random.uniform([1])
-    # toAugment = tf.less_equal(randNum, [0.20])
-    # augFeatures = tf.cond(toAugment[0], lambda: tf_dataAug(features), lambda: features)
-    # augFeatures = tf.cond(toAugment[0], lambda: dataAugmentation(features), lambda: features)
-    # augFeatures = tf_dataAug(features)
-    # augFeatures.set_shape([None, 80, 1])
-    # return augFeatures, label
     return features, label
 
 

@@ -3,6 +3,7 @@ import librosa
 import numpy as np
 import tensorflow as tf
 import itertools
+import random
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -65,10 +66,36 @@ def dataAugmentation(features):
     return augmentedData
 
 
+def augmentData(trainingSetData, trainingSetLabels):
+    augmentedData = trainingSetData
+    augmentedLabels = trainingSetLabels
+    newData = []
+    newLabels = []
+    print("Augmenting Data!")
+    for ind, data in enumerate(augmentData):
+        randNum = np.random.random_sample()
+        if randNum <= 0.20:  # 1 in 5 chance
+            addedData = dataAugmentation(data)
+            newData = np.append(newData, addedData)
+            newLabels = np.append(
+                newLabels, np.repeat([augmentedLabels[ind]], len(addedData))
+            )
+            # repeat the label
+
+    augmentedData["data"] = augmentedData["data"] + newData
+    augmentedData["labels"] = augmentedData["labels"] + newLabels
+
+    return augmentedData
+
+
 def get_data():
     with open("music_genres_dataset.pkl", "rb") as f:
         train_set = pickle.load(f)
         test_set = pickle.load(f)
+
+    # print(train_set)
+    # print(type(train_set))
+    train_set = augmentData(train_set["data"], train_set["labels"])
 
     train_set_data = train_set["data"]
     train_set_labels = train_set["labels"]
