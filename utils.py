@@ -52,8 +52,11 @@ def preprocess_py_func(features, label):
 
 def augmentFunctions(features, params):
     timeStretched = librosa.effects.time_stretch(features, params[0])
-    pitchShifted = librosa.effects.pitch_shift(timeStretched, SAMPLING_RATE, params[1])
+    pitchShifted = np.array(
+        librosa.effects.pitch_shift(timeStretched, SAMPLING_RATE, params[1])
+    )
 
+    # print("Shape of pitchShifted : {0}".format(pitchShifted.shape))
     return pitchShifted
 
 
@@ -68,36 +71,49 @@ def dataAugmentation(features):
     )
 
     combinations = itertools.product(timeStretchValues, pitchShifting)
-    augmentedData = map(
-        lambda x: pad(augmentFunctions(features, x), 11250), combinations
+    augmentedData = np.array(
+        map(
+            lambda x: pad(augmentFunctions(features, x), features.shape[0]),
+            combinations,
+        )
     )
+
     return augmentedData
 
 
 def augmentDataFunc(trainingSetData, trainingSetLabels):
-    trainingData = np.array(trainingSetData)
-    trainingLabels = np.array(trainingSetLabels)
+    # trainingData = np.array(trainingSetData)
+    # trainingLabels = np.array(trainingSetLabels)
 
-    newData = np.empty(shape=[1, 0])
-    newLabels = np.empty(shape=[1, 0])
-    print("Augmenting Data!")
-    for ind, segment in enumerate(trainingData):
+    newData = np.copy(trainingSetData)
+    newLabels = np.copy(trainingSetLabels)
+
+    print("\n \nAugmenting Data! \n \n")
+    pad = (
+        lambda a, i: a[0:i]
+        if a.shape[0] > i
+        else np.hstack((a, np.zeros(i - a.shape[0])))
+    )
+
+    for ind, segment in enumerate(trainingSetData):
         randNum = np.random.random_sample()
         if randNum <= 0.20:  # 1 in 5 chance
-            addedData = dataAugmentation(segment)
-            newData = np.append(newData, addedData)
+            addedData = np.array(dataAugmentation(segment))
+            # print("Shape of addedData : {0}".format(addedData.shape))
+            # print("Shape of newData : {0}".format(newData.shape))
+            newData = np.append(newData, addedData, axis=0)
             newLabels = np.append(
-                newLabels, np.repeat([trainingLabels[ind]], len(addedData))
+                newLabels, np.repeat([trainingSetLabels[ind]], len(addedData)), axis=0
             )
 
     print(
         "BEFORE APPENDING AugmentedData : {0}, augmentedLabels :{1} ".format(
-            trainingData.shape, trainingLabels.shape
+            trainingSetData.shape, trainingSetLabels.shape
         )
     )
 
-    trainingData = np.append(trainingData, newData)
-    trainingLabels = np.append(trainingLabels, newLabels)
+    trainingData = np.copy(newData)
+    trainingLabels = np.copy(newLabels)
 
     print(
         "AFTER APPENDING AugmentedData : {0}, augmentedLabels :{1} ".format(
@@ -125,12 +141,11 @@ def get_data():
     train_set_data = np.array(train_set_data)
     train_set_labels = np.array(train_set_labels)
 
-    print("shape of training set data : {0}".format(train_set_data.shape))
+    # print("shape of training set data : {0}".format(train_set_data.shape))
 
-    print("shape of 1 datapoint : {0}".format(train_set_data[0].shape))
-    train_set_data, train_set_labels = augmentDataFunc(
-        train_set_data[0:50], train_set_labels[0:50]
-    )
+    # print("shape of 1 datapoint : {0}".format(train_set_data[0].shape))
+
+    train_set_data, train_set_labels = augmentDataFunc(train_set_data, train_set_labels)
 
     print(
         "AFTER : Training Set Data : {0}, training set labels : {1}".format(
