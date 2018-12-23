@@ -1,4 +1,6 @@
 #! /bin/bash
+scp ./*.py bcp4:Uni-Deep-Learning/
+
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   while inotifywait -e close_write ./*.py
   do

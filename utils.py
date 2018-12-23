@@ -99,8 +99,10 @@ def get_data():
 
     train_set_data = train_set["data"]
     train_set_labels = train_set["labels"]
+    train_set_track_ids = train_set["track_id"]
     test_set_data = test_set["data"]
     test_set_labels = test_set["labels"]
+<<<<<<< HEAD
     return (train_set_data, train_set_labels, test_set_data, test_set_labels)
 
 
@@ -119,3 +121,7 @@ Data Augmentation writing up:
 
 """
 
+=======
+    test_set_track_ids = test_set["track_id"]
+    return (train_set_data, train_set_labels, train_set_track_ids, test_set_data, test_set_labels, test_set_track_ids)
+>>>>>>> master
