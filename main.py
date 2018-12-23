@@ -15,6 +15,10 @@ from evaluate import evaluate
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_integer(
+    "epochs", 100, "Number of mini-batches to train on. (default: %(default)d)"
+)
+
+tf.app.flags.DEFINE_integer(
     "num_parallel_calls", 1, "Number of cpu cores to use to preprocess data"
 )
 tf.app.flags.DEFINE_integer(

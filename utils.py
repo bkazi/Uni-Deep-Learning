@@ -99,8 +99,6 @@ def augmentDataFunc(trainingSetData, trainingSetLabels):
         randNum = np.random.random_sample()
         if randNum <= 0.20:  # 1 in 5 chance
             addedData = np.array(dataAugmentation(segment))
-            # print("Shape of addedData : {0}".format(addedData.shape))
-            # print("Shape of newData : {0}".format(newData.shape))
             newData = np.append(newData, addedData, axis=0)
             newLabels = np.append(
                 newLabels, np.repeat([trainingSetLabels[ind]], len(addedData)), axis=0
