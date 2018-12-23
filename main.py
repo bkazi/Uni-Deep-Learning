@@ -15,12 +15,6 @@ from evaluate import evaluate
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_integer(
-    "batch_size", 16, "Number of examples per mini-batch (default: %(default)d)"
-)
-tf.app.flags.DEFINE_float(
-    "learning_rate", 0.00005, "Learning rate (default: %(default)d)"
-)
-tf.app.flags.DEFINE_integer(
     "num_parallel_calls", 1, "Number of cpu cores to use to preprocess data"
 )
 tf.app.flags.DEFINE_integer(

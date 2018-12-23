@@ -58,34 +58,54 @@ def augmentFunctions(features, params):
 
 
 def dataAugmentation(features):
+    features = np.array(features)
     timeStretchValues = [1.2, 1.5, 0.5, 0.2]
     pitchShifting = [-2, -5, 2, 5]
+    pad = (
+        lambda a, i: a[0:i]
+        if a.shape[0] > i
+        else np.hstack((a, np.zeros(i - a.shape[0])))
+    )
 
     combinations = itertools.product(timeStretchValues, pitchShifting)
-    augmentedData = map(lambda x: augmentFunctions(features, x), combinations)
+    augmentedData = map(
+        lambda x: pad(augmentFunctions(features, x), 11250), combinations
+    )
     return augmentedData
 
 
-def augmentData(trainingSetData, trainingSetLabels):
-    augmentedData = trainingSetData
-    augmentedLabels = trainingSetLabels
-    newData = []
-    newLabels = []
+def augmentDataFunc(trainingSetData, trainingSetLabels):
+    trainingData = np.array(trainingSetData)
+    trainingLabels = np.array(trainingSetLabels)
+
+    newData = np.empty(shape=[1, 0])
+    newLabels = np.empty(shape=[1, 0])
     print("Augmenting Data!")
-    for ind, data in enumerate(augmentData):
+    for ind, segment in enumerate(trainingData):
         randNum = np.random.random_sample()
         if randNum <= 0.20:  # 1 in 5 chance
-            addedData = dataAugmentation(data)
+            addedData = dataAugmentation(segment)
             newData = np.append(newData, addedData)
             newLabels = np.append(
-                newLabels, np.repeat([augmentedLabels[ind]], len(addedData))
+                newLabels, np.repeat([trainingLabels[ind]], len(addedData))
             )
-            # repeat the label
 
-    augmentedData["data"] = augmentedData["data"] + newData
-    augmentedData["labels"] = augmentedData["labels"] + newLabels
+    print(
+        "BEFORE APPENDING AugmentedData : {0}, augmentedLabels :{1} ".format(
+            trainingData.shape, trainingLabels.shape
+        )
+    )
 
-    return augmentedData
+    trainingData = np.append(trainingData, newData)
+    trainingLabels = np.append(trainingLabels, newLabels)
+
+    print(
+        "AFTER APPENDING AugmentedData : {0}, augmentedLabels :{1} ".format(
+            trainingData.shape, trainingLabels.shape
+        )
+    )
+
+    return trainingData, trainingLabels
 
 
 def get_data():
@@ -93,35 +113,41 @@ def get_data():
         train_set = pickle.load(f)
         test_set = pickle.load(f)
 
-    # print(train_set)
-    # print(type(train_set))
-    train_set = augmentData(train_set["data"], train_set["labels"])
+    print(
+        "BEFORE : Training Set Data : {0}, training set labels : {1}".format(
+            len(train_set["data"]), len(train_set["labels"])
+        )
+    )
 
     train_set_data = train_set["data"]
     train_set_labels = train_set["labels"]
+
+    train_set_data = np.array(train_set_data)
+    train_set_labels = np.array(train_set_labels)
+
+    print("shape of training set data : {0}".format(train_set_data.shape))
+
+    print("shape of 1 datapoint : {0}".format(train_set_data[0].shape))
+    train_set_data, train_set_labels = augmentDataFunc(
+        train_set_data[0:50], train_set_labels[0:50]
+    )
+
+    print(
+        "AFTER : Training Set Data : {0}, training set labels : {1}".format(
+            len(train_set_data), len(train_set_labels)
+        )
+    )
+
     train_set_track_ids = train_set["track_id"]
     test_set_data = test_set["data"]
     test_set_labels = test_set["labels"]
-<<<<<<< HEAD
-    return (train_set_data, train_set_labels, test_set_data, test_set_labels)
-
-
-"""
-Data Augmentation writing up:
-  # # 1 in 5 chance
-    # randNum = tf.random.uniform([1])
-    # toAugment = tf.less_equal(randNum, [0.20])
-    # augFeatures = tf.cond(toAugment[0], lambda: tf_dataAug(features), lambda: features)
-    # augFeatures = tf.cond(toAugment[0], lambda: dataAugmentation(features), lambda: features)
-    # augFeatures = tf_dataAug(features)
-    # augFeatures.set_shape([None, 80, 1])
-    # return augFeatures, label
-
-
-
-"""
-
-=======
     test_set_track_ids = test_set["track_id"]
-    return (train_set_data, train_set_labels, train_set_track_ids, test_set_data, test_set_labels, test_set_track_ids)
->>>>>>> master
+    return (
+        train_set_data,
+        train_set_labels,
+        train_set_track_ids,
+        test_set_data,
+        test_set_labels,
+        test_set_track_ids,
+    )
+
