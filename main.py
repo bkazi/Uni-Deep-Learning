@@ -9,7 +9,7 @@ import tensorflow as tf
 from functools import reduce
 
 from utils import preprocess_py_func, get_data, tf_melspectogram, dataAugmentation
-from shallow_nn import shallow_nn
+from deep_nn import shallow_nn
 from evaluate import evaluate
 
 FLAGS = tf.app.flags.FLAGS
