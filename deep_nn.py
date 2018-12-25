@@ -10,7 +10,9 @@ def activation_func(x):
     return tf.nn.leaky_relu(x, alpha=0.3)
 
 
-def frequency_graph(x):
+def frequency_graph(x, is_training):
+    improve = FLAGS.improve == 1
+
     with tf.variable_scope('Freq'):
         with tf.variable_scope('Layer1'):
             fconv1 = tf.layers.conv2d(
@@ -19,13 +21,15 @@ def frequency_graph(x):
                 kernel_size=[10, 23],
                 strides=(1, 1),
                 padding="same",
-                activation=activation_func,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.contrib.layers.xavier_initializer(),
                 kernel_regularizer=l1_regularizer,
                 bias_regularizer=l1_regularizer,
                 name='conv'
             )
+            if (improve):
+                fconv1 = activation_func(
+                    tf.layers.batch_normalization(fconv1, training=is_training))
             fpool1 = tf.layers.max_pooling2d(
                 fconv1,
                 pool_size=[2, 2],
@@ -41,13 +45,15 @@ def frequency_graph(x):
                 kernel_size=[5, 11],
                 strides=(1, 1),
                 padding="same",
-                activation=activation_func,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.contrib.layers.xavier_initializer(),
                 kernel_regularizer=l1_regularizer,
                 bias_regularizer=l1_regularizer,
                 name='conv'
             )
+            if (improve):
+                fconv2 = activation_func(
+                    tf.layers.batch_normalization(fconv2, training=is_training))
             fpool2 = tf.layers.max_pooling2d(
                 fconv2,
                 pool_size=[2, 2],
@@ -63,13 +69,15 @@ def frequency_graph(x):
                 kernel_size=[3, 5],
                 strides=(1, 1),
                 padding="same",
-                activation=activation_func,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.contrib.layers.xavier_initializer(),
                 kernel_regularizer=l1_regularizer,
                 bias_regularizer=l1_regularizer,
                 name='conv'
             )
+            if (improve):
+                fconv3 = activation_func(
+                    tf.layers.batch_normalization(fconv3, training=is_training))
             fpool3 = tf.layers.max_pooling2d(
                 fconv3,
                 pool_size=[2, 2],
@@ -85,13 +93,15 @@ def frequency_graph(x):
                 kernel_size=[2, 4],
                 strides=(1, 1),
                 padding="same",
-                activation=activation_func,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.contrib.layers.xavier_initializer(),
                 kernel_regularizer=l1_regularizer,
                 bias_regularizer=l1_regularizer,
                 name='conv'
             )
+            if (improve):
+                fconv4 = activation_func(
+                    tf.layers.batch_normalization(fconv4, training=is_training))
             fpool4 = tf.layers.max_pooling2d(
                 fconv4,
                 pool_size=[1, 5],
@@ -105,7 +115,9 @@ def frequency_graph(x):
     return fflat
 
 
-def temporal_graph(x):
+def temporal_graph(x, is_training):
+    improve = FLAGS.improve == 1
+
     with tf.variable_scope('Temp'):
         with tf.variable_scope('Layer1'):
             tconv1 = tf.layers.conv2d(
@@ -114,13 +126,15 @@ def temporal_graph(x):
                 kernel_size=[21, 10],
                 strides=(1, 1),
                 padding="same",
-                activation=activation_func,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.contrib.layers.xavier_initializer(),
                 kernel_regularizer=l1_regularizer,
                 bias_regularizer=l1_regularizer,
                 name='conv'
             )
+            if (improve):
+                tconv1 = activation_func(
+                    tf.layers.batch_normalization(tconv1, training=is_training))
             tpool1 = tf.layers.max_pooling2d(
                 tconv1,
                 pool_size=[2, 2],
@@ -136,13 +150,15 @@ def temporal_graph(x):
                 kernel_size=[10, 5],
                 strides=(1, 1),
                 padding="same",
-                activation=activation_func,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.contrib.layers.xavier_initializer(),
                 kernel_regularizer=l1_regularizer,
                 bias_regularizer=l1_regularizer,
                 name='conv'
             )
+            if (improve):
+                tconv2 = activation_func(
+                    tf.layers.batch_normalization(tconv2, training=is_training))
             tpool2 = tf.layers.max_pooling2d(
                 tconv2,
                 pool_size=[2, 2],
@@ -158,13 +174,15 @@ def temporal_graph(x):
                 kernel_size=[5, 3],
                 strides=(1, 1),
                 padding="same",
-                activation=activation_func,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.contrib.layers.xavier_initializer(),
                 kernel_regularizer=l1_regularizer,
                 bias_regularizer=l1_regularizer,
                 name='conv'
             )
+            if (improve):
+                tconv3 = activation_func(
+                    tf.layers.batch_normalization(tconv3, training=is_training))
             tpool3 = tf.layers.max_pooling2d(
                 tconv3,
                 pool_size=[2, 2],
@@ -180,13 +198,15 @@ def temporal_graph(x):
                 kernel_size=[4, 2],
                 strides=(1, 1),
                 padding="same",
-                activation=activation_func,
                 kernel_initializer=tf.contrib.layers.xavier_initializer(),
                 bias_initializer=tf.contrib.layers.xavier_initializer(),
                 kernel_regularizer=l1_regularizer,
                 bias_regularizer=l1_regularizer,
                 name='conv'
             )
+            if (improve):
+                tconv4 = activation_func(
+                    tf.layers.batch_normalization(tconv4, training=is_training))
             tpool4 = tf.layers.max_pooling2d(
                 tconv4,
                 pool_size=[5, 1],
@@ -212,8 +232,8 @@ def deep_nn(x, is_training):
     x = tf_melspectogram(x)
     img_summary = tf.summary.image('Input_images', x)
 
-    freq = frequency_graph(x)
-    temp = temporal_graph(x)
+    freq = frequency_graph(x, is_training)
+    temp = temporal_graph(x, is_training)
 
     concat = tf.concat([freq, temp], 1)
 

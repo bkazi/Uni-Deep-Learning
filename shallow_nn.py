@@ -19,6 +19,7 @@ def shallow_nn(x, is_training):
     """
     l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.0001)
     x = tf_melspectogram(x)
+    improve = FLAGS.improve == 1
 
     img_summary = tf.summary.image('Input_images', x)
 
@@ -30,13 +31,15 @@ def shallow_nn(x, is_training):
             kernel_size=[10, 23],
             strides=(1, 1),
             padding="same",
-            activation=activation_func,
             kernel_initializer=tf.contrib.layers.xavier_initializer(),
             bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             name='fconv'
         )
+        if (improve):
+            fconv = activation_func(
+                tf.layers.batch_normalization(fconv, training=is_training))
         fpool = tf.layers.max_pooling2d(
             inputs=fconv,
             pool_size=[1, 20],
@@ -60,6 +63,9 @@ def shallow_nn(x, is_training):
             bias_regularizer=l1_regularizer,
             name='tconv'
         )
+        if (improve):
+            tconv = activation_func(
+                tf.layers.batch_normalization(tconv, training=is_training))
         tpool = tf.layers.max_pooling2d(
             inputs=tconv,
             pool_size=[20, 1],
