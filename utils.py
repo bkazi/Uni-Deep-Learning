@@ -56,7 +56,6 @@ def augmentFunctions(features, params):
         librosa.effects.pitch_shift(timeStretched, SAMPLING_RATE, params[1])
     )
 
-    # print("Shape of pitchShifted : {0}".format(pitchShifted.shape))
     return pitchShifted
 
 
@@ -82,8 +81,6 @@ def dataAugmentation(features):
 
 
 def augmentDataFunc(trainingSetData, trainingSetLabels):
-    # trainingData = np.array(trainingSetData)
-    # trainingLabels = np.array(trainingSetLabels)
 
     newData = np.copy(trainingSetData)
     newLabels = np.copy(trainingSetLabels)
@@ -110,8 +107,8 @@ def augmentDataFunc(trainingSetData, trainingSetLabels):
         )
     )
 
-    trainingData = np.copy(newData)
-    trainingLabels = np.copy(newLabels)
+    trainingData = newData
+    trainingLabels = newLabels
 
     print(
         "AFTER APPENDING AugmentedData : {0}, augmentedLabels :{1} ".format(
@@ -138,10 +135,6 @@ def get_data():
 
     train_set_data = np.array(train_set_data)
     train_set_labels = np.array(train_set_labels)
-
-    # print("shape of training set data : {0}".format(train_set_data.shape))
-
-    # print("shape of 1 datapoint : {0}".format(train_set_data[0].shape))
 
     train_set_data, train_set_labels = augmentDataFunc(train_set_data, train_set_labels)
 
