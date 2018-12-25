@@ -23,17 +23,11 @@ def tf_melspectogram(audio):
     num_mel_bins, lower_edge_hertz, upper_edge_hertz = 80, 0, sample_rate/2
     mel_basis = tf.contrib.signal.linear_to_mel_weight_matrix(
         num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz, upper_edge_hertz)
-    mel_spec = tf.tensordot(mag_spec, mel_basis, 1)
-    mel_spec.set_shape(
-        mag_spec.shape[:-1].concatenate(mel_basis.shape[-1:]))
+    mel_basis = tf.transpose(mel_basis)
+    mel_spec = tf.map_fn(lambda x: tf.matmul(
+        mel_basis, x), tf.transpose(mag_spec, perm=[0, 2, 1]))
     mel_spec = tf.expand_dims(mel_spec, -1)
     return tf.log(mel_spec + 1e-6)
-
-
-def preprocess_py_func(features, label):
-    transformed = melspectrogram(features)[:, :, np.newaxis]
-    transformed = transformed.astype('float32')
-    return transformed, label
 
 
 def get_data():
