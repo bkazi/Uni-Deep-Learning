@@ -18,8 +18,10 @@ tf.app.flags.DEFINE_integer('epochs', 100,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('network', 0,
                             'Type of network to use, 0 for shallow, 1 for deep. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('improve', 0,
-                            'Turn improvements on or off, 0 for off, 1 for improvements on. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('bn', 0,
+                            'Turn batch norm on or off, 0 for off, 1 for improvements on. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('decay', 0,
+                            'Turn decaying learning rate on or off. (default: %(default)d')
 tf.app.flags.DEFINE_integer('log_frequency', 100,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 tf.app.flags.DEFINE_integer('num_parallel_calls', 1,
@@ -30,8 +32,8 @@ tf.app.flags.DEFINE_integer('save_model', 1000,
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer(
     'batch_size', 16, 'Number of examples per mini-batch (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning_rate', 0.00005,
-                          'Learning rate (default: %(default)d)')
+tf.app.flags.DEFINE_float(
+    'learning_rate', 5e-5, 'Learning rate (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
     'input_width', 80, 'Input width (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
@@ -44,8 +46,8 @@ tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
                            'Directory where to write event logs and checkpoint. (default: %(default)s)')
 
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_lr_{learning_rate}_bs_{batch_size}_e_{epochs}_{network}'.format(
-    learning_rate=FLAGS.learning_rate, batch_size=FLAGS.batch_size,  epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep'))
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_lr_{learning_rate}_decay_{decay}_bs_{batch_size}_e_{epochs}_{network}_bn_{bn}'.format(
+    learning_rate=FLAGS.learning_rate, decay={FLAGS.decay}, batch_size=FLAGS.batch_size, epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep', bn=FLAGS.bn))
 
 
 def model(iterator, is_training, nn):
@@ -108,7 +110,7 @@ def main(_):
 
     dataset = tf.data.Dataset.from_tensor_slices(
         (features_placeholder, labels_placeholder))
-    dataset = dataset.shuffle(buffer_size=100)
+    dataset = dataset.shuffle(buffer_size=1000)
     dataset = dataset.map(_preprocess)
     dataset = dataset.batch(FLAGS.batch_size)
     dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
@@ -128,12 +130,18 @@ def main(_):
     loss, img_summary = model(
         train_iterator, is_training_placeholder, nn)
 
+    global_step = tf.Variable(0, trainable=False)
+    if (FLAGS.decay):
+        learning_rate = tf.train.exponential_decay(
+            FLAGS.learning_rate, global_step, 1000, 1e-5)
+    else:
+        learning_rate = FLAGS.learning_rate
     # Adam Optimiser
     # default values match that in paper
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
         optimiser = tf.train.AdamOptimizer(
-            FLAGS.learning_rate, name="AdamOpt").minimize(loss)
+            learning_rate, name="AdamOpt").minimize(loss, global_step=global_step)
 
     validation_accuracy, acc_op = calc_accuracy(
         test_iterator, is_training_placeholder, nn)

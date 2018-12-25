@@ -19,7 +19,7 @@ def shallow_nn(x, is_training):
     """
     l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.0001)
     x = tf_melspectogram(x)
-    improve = FLAGS.improve == 1
+    improve = FLAGS.bn == 1
 
     img_summary = tf.summary.image('Input_images', x)
 

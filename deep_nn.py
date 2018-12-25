@@ -11,7 +11,7 @@ def activation_func(x):
 
 
 def frequency_graph(x, is_training):
-    improve = FLAGS.improve == 1
+    improve = FLAGS.bn == 1
 
     with tf.variable_scope('Freq'):
         with tf.variable_scope('Layer1'):
@@ -116,7 +116,7 @@ def frequency_graph(x, is_training):
 
 
 def temporal_graph(x, is_training):
-    improve = FLAGS.improve == 1
+    improve = FLAGS.bn == 1
 
     with tf.variable_scope('Temp'):
         with tf.variable_scope('Layer1'):
