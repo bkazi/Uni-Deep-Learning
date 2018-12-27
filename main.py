@@ -120,10 +120,11 @@ def main(_):
     dataset = tf.data.Dataset.from_tensor_slices(
         (features_placeholder, labels_placeholder)
     )
-    dataset = dataset.shuffle(buffer_size=100)
-    dataset = dataset.map(_preprocess)
-    dataset = dataset.batch(FLAGS.batch_size)
-    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+    dataset = dataset.shuffle(buffer_size=1000)
+    dataset = dataset.apply(
+        tf.data.experimental.map_and_batch(_preprocess, FLAGS.batch_size)
+    )
+    dataset = dataset.prefetch(1)
 
     train_iterator = dataset.make_initializable_iterator()
     test_iterator = dataset.make_initializable_iterator()
