@@ -4,6 +4,8 @@ import numpy as np
 import tensorflow as tf
 import itertools
 import random
+from multiprocessing import Pool
+import time
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -30,7 +32,8 @@ def tf_melspectogram(audio):
     )
     mag_spec = tf.abs(spec)
     num_spectrogram_bins = mag_spec.shape[-1].value
-    num_mel_bins, lower_edge_hertz, upper_edge_hertz = 80, 0, (SAMPLING_RATE / 2)
+    num_mel_bins, lower_edge_hertz, upper_edge_hertz = 80, 0, (
+        SAMPLING_RATE / 2)
     mel_basis = tf.contrib.signal.linear_to_mel_weight_matrix(
         num_mel_bins,
         num_spectrogram_bins,
@@ -59,87 +62,86 @@ def augmentFunctions(features, params):
     return pitchShifted
 
 
-def dataAugmentation(features):
-    features = np.array(features)
+def pad(x, length):
+    x_len = x.shape[0]
+    if x_len > length:
+        return x[:length]
+    else:
+        return np.hstack((x, np.zeros(length - x_len)))
+
+
+def augmentInner(sample_param):
+    features, params = sample_param
+    return pad(augmentFunctions(features, params), np.shape(features)[0])
+
+
+def dataAugmentationFeatures(samples, pool):
     timeStretchValues = [1.2, 1.5, 0.5, 0.2]
     pitchShifting = [-2, -5, 2, 5]
-    pad = (
-        lambda a, i: a[0:i]
-        if a.shape[0] > i
-        else np.hstack((a, np.zeros(i - a.shape[0])))
-    )
+    param_combinations = itertools.product(timeStretchValues, pitchShifting)
+    samples_param_combinations = itertools.product(samples, param_combinations)
 
-    combinations = itertools.product(timeStretchValues, pitchShifting)
-    augmentedData = np.array(
-        map(
-            lambda x: pad(augmentFunctions(features, x), features.shape[0]),
-            combinations,
-        )
-    )
+    return pool.map(augmentInner, samples_param_combinations)
 
-    return augmentedData
+
+num_samples = 3
+num_segments_per_track = 15
+num_augments = 16
+
+
+def dataAugmentationLabels(labels):
+    return np.repeat(labels, num_augments)
 
 
 def augmentDataFunc(trainingSetData, trainingSetLabels):
+    print("Augmenting Data!")
 
-    newData = np.copy(trainingSetData)
-    newLabels = np.copy(trainingSetLabels)
+    sampleIdx = [np.random.randint(i * num_segments_per_track, (i + 1) * num_segments_per_track, size=num_samples)
+                 for i in range(len(trainingSetData) / num_segments_per_track)]
+    sampleIdx = np.array(sampleIdx).flatten()
+    samplesToAugment = trainingSetData[sampleIdx]
+    labelsToRepeat = trainingSetLabels[sampleIdx]
 
-    print("\n \nAugmenting Data! \n \n")
-    pad = (
-        lambda a, i: a[0:i]
-        if a.shape[0] > i
-        else np.hstack((a, np.zeros(i - a.shape[0])))
-    )
+    p = Pool(FLAGS.num_parallel_calls)
+    newData = dataAugmentationFeatures(samplesToAugment, p)
+    newLabels = p.map(dataAugmentationLabels, labelsToRepeat)
+    p.close()
+    p.join()
 
-    for ind, segment in enumerate(trainingSetData):
-        randNum = np.random.random_sample()
-        if randNum <= 0.20:  # 1 in 5 chance
-            addedData = np.array(dataAugmentation(segment))
-            newData = np.append(newData, addedData, axis=0)
-            newLabels = np.append(
-                newLabels, np.repeat([trainingSetLabels[ind]], len(addedData)), axis=0
-            )
+    newData = np.array(newData)
+    newLabels = np.array(newLabels).flatten()
 
-    print(
-        "BEFORE APPENDING AugmentedData : {0}, augmentedLabels :{1} ".format(
-            trainingSetData.shape, trainingSetLabels.shape
-        )
-    )
+    train_len = len(trainingSetData)
+    new_len = len(newData)
 
-    trainingData = newData
-    trainingLabels = newLabels
-
-    print(
-        "AFTER APPENDING AugmentedData : {0}, augmentedLabels :{1} ".format(
-            trainingData.shape, trainingLabels.shape
-        )
-    )
+    trainingData = np.vstack(
+        (trainingSetData[train_len/2:], newData[:new_len/2], trainingSetData[:train_len/2], newData[new_len/2:]))
+    trainingLabels = np.hstack(
+        (trainingSetLabels[train_len/2:], newLabels[:new_len/2], trainingSetLabels[:train_len/2], newLabels[new_len/2:]))
 
     return trainingData, trainingLabels
 
 
 def get_data():
+    start = time.time()
     with open("music_genres_dataset.pkl", "rb") as f:
         train_set = pickle.load(f)
         test_set = pickle.load(f)
+    end = time.time()
+    print("Time time to read dataset: {:.2f}s".format(end - start))
+
+    train_set_data = np.array(train_set["data"])
+    train_set_labels = np.array(train_set["labels"])
+
+    if (FLAGS.augment == 1):
+        start = time.time()
+        train_set_data, train_set_labels = augmentDataFunc(
+            train_set_data, train_set_labels)
+        end = time.time()
+        print("Time to augment dataset: {:.2f}m".format((end - start) / 60.0))
 
     print(
-        "BEFORE : Training Set Data : {0}, training set labels : {1}".format(
-            len(train_set["data"]), len(train_set["labels"])
-        )
-    )
-
-    train_set_data = train_set["data"]
-    train_set_labels = train_set["labels"]
-
-    train_set_data = np.array(train_set_data)
-    train_set_labels = np.array(train_set_labels)
-
-    train_set_data, train_set_labels = augmentDataFunc(train_set_data, train_set_labels)
-
-    print(
-        "AFTER : Training Set Data : {0}, training set labels : {1}".format(
+        "Training Set Data: {0}, training set labels: {1}".format(
             len(train_set_data), len(train_set_labels)
         )
     )
@@ -156,4 +158,3 @@ def get_data():
         test_set_labels,
         test_set_track_ids,
     )
-

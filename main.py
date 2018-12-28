@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 from functools import reduce
 
-from utils import preprocess_py_func, get_data, tf_melspectogram, dataAugmentation
+from utils import get_data, tf_melspectogram
 from deep_nn import shallow_nn
 from evaluate import evaluate
 
@@ -22,6 +22,9 @@ tf.app.flags.DEFINE_integer(
     "num_parallel_calls", 1, "Number of cpu cores to use to preprocess data"
 )
 tf.app.flags.DEFINE_integer(
+    "augment", 0, "Use augmentation, 0 for off, 1 for on (default: %(default)d)"
+)
+tf.app.flags.DEFINE_integer(
     "save_model", 1000, "Number of steps between model saves (default: %(default)d)"
 )
 
@@ -29,9 +32,12 @@ tf.app.flags.DEFINE_integer(
 tf.app.flags.DEFINE_integer(
     "batch_size", 16, "Number of examples per mini-batch (default: %(default)d)"
 )
-tf.app.flags.DEFINE_float("learning_rate", 5e-5, "Learning rate (default: %(default)d)")
-tf.app.flags.DEFINE_integer("input_width", 80, "Input width (default: %(default)d)")
-tf.app.flags.DEFINE_integer("input_height", 80, "Input height (default: %(default)d)")
+tf.app.flags.DEFINE_float("learning_rate", 5e-5,
+                          "Learning rate (default: %(default)d)")
+tf.app.flags.DEFINE_integer(
+    "input_width", 80, "Input width (default: %(default)d)")
+tf.app.flags.DEFINE_integer(
+    "input_height", 80, "Input height (default: %(default)d)")
 tf.app.flags.DEFINE_integer(
     "input_channels", 1, "Input channels (default: %(default)d)"
 )
@@ -60,7 +66,8 @@ def model(iterator, is_training, nn):
     # Compute categorical loss
     with tf.variable_scope("cross_entropy"):
         cross_entropy = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits_v2(labels=next_y, logits=y_out)
+            tf.nn.softmax_cross_entropy_with_logits_v2(
+                labels=next_y, logits=y_out)
         )
 
     # L1 regularise
@@ -78,7 +85,8 @@ def calc_accuracy(iterator, is_training, nn):
     with tf.variable_scope("Model", reuse=tf.AUTO_REUSE):
         y_out = nn(next_x, is_training)
 
-    correct_prediction = tf.equal(tf.argmax(next_y, axis=1), tf.argmax(y_out, axis=1))
+    correct_prediction = tf.equal(
+        tf.argmax(next_y, axis=1), tf.argmax(y_out, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
     return accuracy
@@ -117,12 +125,14 @@ def main(_):
     labels_placeholder = tf.placeholder(tf.uint8, (None))
     track_ids_placeholder = tf.placeholder(tf.uint8, (None))
 
+    shuffle_buffer_size = 1000 if (FLAGS.augment == 0) else 30000
     dataset = tf.data.Dataset.from_tensor_slices(
         (features_placeholder, labels_placeholder)
     )
-    dataset = dataset.shuffle(buffer_size=1000)
+    dataset = dataset.shuffle(buffer_size=shuffle_buffer_size)
     dataset = dataset.apply(
-        tf.data.experimental.map_and_batch(_preprocess, FLAGS.batch_size)
+        tf.data.experimental.map_and_batch(
+            _preprocess, FLAGS.batch_size, num_parallel_calls=FLAGS.num_parallel_calls)
     )
     dataset = dataset.prefetch(1)
 
@@ -159,7 +169,8 @@ def main(_):
 
     with tf.Session() as sess:
 
-        summary_writer = tf.summary.FileWriter(run_log_dir + "_train", sess.graph)
+        summary_writer = tf.summary.FileWriter(
+            run_log_dir + "_train", sess.graph)
         summary_writer_validation = tf.summary.FileWriter(
             run_log_dir + "_validate", sess.graph
         )
@@ -243,9 +254,10 @@ def main(_):
         raw_probability, maximum_probability, majority_vote = evaluate(results)
 
         print("-----===== Summary =====-----")
-        print("Raw Probability: ", raw_probability)
-        print("Maximum Probability: ", maximum_probability)
-        print("Majority Vote: ", majority_vote)
+        print("Raw Probability: {:.2f}%".format(raw_probability * 100.0))
+        print("Maximum Probability: {:.2f}%".format(
+            maximum_probability * 100.0))
+        print("Majority Vote: {:.2f}%".format(majority_vote * 100))
 
 
 if __name__ == "__main__":
