@@ -20,6 +20,8 @@ def shallow_nn(x, is_training):
     l1_regularizer = tf.contrib.layers.l1_regularizer(scale=0.0001)
     x = tf_melspectogram(x)
 
+    img_summary = tf.summary.image('Input_images', x)
+
     # Frequency
     with tf.variable_scope('Layer1_Freq'):
         fconv = tf.layers.conv2d(
@@ -98,4 +100,4 @@ def shallow_nn(x, is_training):
 
     y = fc2
 
-    return y
+    return y, img_summary

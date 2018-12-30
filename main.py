@@ -7,26 +7,23 @@ import os
 import numpy as np
 import tensorflow as tf
 from functools import reduce
-
-from utils import get_data, tf_melspectogram
-from deep_nn import shallow_nn
 from evaluate import evaluate
+from utils import get_data, tf_melspectogram
+from shallow_nn import shallow_nn
+from deep_nn import deep_nn
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer(
-    "epochs", 100, "Number of mini-batches to train on. (default: %(default)d)"
-)
-
-tf.app.flags.DEFINE_integer(
-    "num_parallel_calls", 1, "Number of cpu cores to use to preprocess data"
-)
-tf.app.flags.DEFINE_integer(
-    "augment", 0, "Use augmentation, 0 for off, 1 for on (default: %(default)d)"
-)
-tf.app.flags.DEFINE_integer(
-    "save_model", 1000, "Number of steps between model saves (default: %(default)d)"
-)
+tf.app.flags.DEFINE_integer('epochs', 100,
+                            'Number of mini-batches to train on. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('network', 0,
+                            'Type of network to use, 0 for shallow, 1 for deep. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('augment', 0,
+                            'Use augmentation, 0 for off, 1 for on (default: %(default)d)')
+tf.app.flags.DEFINE_integer('num_parallel_calls', 1,
+                            'Number of cpu cores to use to preprocess data')
+tf.app.flags.DEFINE_integer('save_model', 1000,
+                            'Number of steps between model saves (default: %(default)d)')
 
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer(
@@ -51,17 +48,15 @@ tf.app.flags.DEFINE_string(
 )
 
 
-run_log_dir = os.path.join(
-    FLAGS.log_dir,
-    "exp_bs_{bs}_lr_{lr}".format(bs=FLAGS.batch_size, lr=FLAGS.learning_rate),
-)
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_e_{epochs}_{network}_augment_{augment}'.format(
+    epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep'), augment=FLAGS.augment)
 
 
 def model(iterator, is_training, nn):
     next_x, next_y = iterator.get_next()
 
-    with tf.variable_scope("Model", reuse=tf.AUTO_REUSE):
-        y_out = nn(next_x, is_training)
+    with tf.variable_scope('Model', reuse=tf.AUTO_REUSE):
+        y_out, img_summary = nn(next_x, is_training)
 
     # Compute categorical loss
     with tf.variable_scope("cross_entropy"):
@@ -76,27 +71,26 @@ def model(iterator, is_training, nn):
     )
     regularized_loss = cross_entropy + regularization_penalty
 
-    return regularized_loss
+    return regularized_loss, img_summary
 
 
 def calc_accuracy(iterator, is_training, nn):
     next_x, next_y = iterator.get_next()
 
-    with tf.variable_scope("Model", reuse=tf.AUTO_REUSE):
-        y_out = nn(next_x, is_training)
+    with tf.variable_scope('Model', reuse=tf.AUTO_REUSE):
+        y_out, _ = nn(next_x, is_training)
 
-    correct_prediction = tf.equal(
-        tf.argmax(next_y, axis=1), tf.argmax(y_out, axis=1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    accuracy, accuracy_op = tf.metrics.accuracy(
+        tf.argmax(next_y, axis=1), tf.argmax(y_out, axis=1), name="accuracy")
 
-    return accuracy
+    return accuracy, accuracy_op
 
 
 def accumulate_results(iterator, is_training, nn):
     x, y, i = iterator.get_next()
 
-    with tf.variable_scope("Model", reuse=tf.AUTO_REUSE):
-        y_out = nn(x, is_training)
+    with tf.variable_scope('Model', reuse=tf.AUTO_REUSE):
+        y_out, _ = nn(x, is_training)
 
     return (x, y, y_out, i)
 
@@ -152,7 +146,10 @@ def main(_):
     eval_dataset = eval_dataset.batch(1)
     eval_iterator = eval_dataset.make_initializable_iterator()
 
-    loss = model(train_iterator, is_training_placeholder, shallow_nn)
+    nn = shallow_nn if (FLAGS.network == 0) else deep_nn
+
+    loss, img_summary = model(
+        train_iterator, is_training_placeholder, nn)
 
     # Adam Optimiser
     # default values match that in paper
@@ -160,12 +157,22 @@ def main(_):
         loss
     )
 
-    validation_accuracy = calc_accuracy(
-        test_iterator, is_training_placeholder, shallow_nn
-    )
+    validation_accuracy, acc_op = calc_accuracy(
+        test_iterator, is_training_placeholder, nn)
 
     loss_summary = tf.summary.scalar("Loss", loss)
     acc_summary = tf.summary.scalar("Accuracy", validation_accuracy)
+
+    training_summary = tf.summary.merge([img_summary, loss_summary])
+    validation_summary = tf.summary.merge([acc_summary])
+
+    # Isolate the variables stored behind the scenes by the metric operation
+    running_vars = tf.get_collection(
+        tf.GraphKeys.LOCAL_VARIABLES, scope="accuracy")
+
+    # Define initializer to initialize/reset running variables
+    running_vars_initializer = tf.variables_initializer(
+        var_list=running_vars)
 
     with tf.Session() as sess:
 
@@ -177,70 +184,38 @@ def main(_):
 
         sess.run(tf.global_variables_initializer())
 
-        num_train_batches = round(len(train_set_data) / FLAGS.batch_size)
-        num_test_batches = round(len(test_set_data) / FLAGS.batch_size)
         for epoch in range(FLAGS.epochs):
-            sess.run(
-                train_iterator.initializer,
-                feed_dict={
-                    features_placeholder: train_set_data,
-                    labels_placeholder: train_set_labels,
-                },
-            )
+            sess.run(running_vars_initializer)
+            sess.run(train_iterator.initializer, feed_dict={
+                features_placeholder: train_set_data, labels_placeholder: train_set_labels})
 
-            batch_counter = 0
             # Run until all samples done
             while True:
                 try:
-                    _, summary_str = sess.run(
-                        [optimiser, loss_summary],
-                        feed_dict={is_training_placeholder: True},
-                    )
-                    summary_writer.add_summary(
-                        summary_str, epoch * num_train_batches + batch_counter
-                    )
-                    batch_counter += 1
+                    _, summary_str = sess.run([optimiser, training_summary], feed_dict={
+                                              is_training_placeholder: True})
                 except tf.errors.OutOfRangeError:
                     break
 
-            sess.run(
-                test_iterator.initializer,
-                feed_dict={
-                    features_placeholder: test_set_data,
-                    labels_placeholder: test_set_labels,
-                },
-            )
-            accuracies = []
-            batch_counter = 0
+            summary_writer.add_summary(summary_str, epoch)
+
+            sess.run(test_iterator.initializer, feed_dict={
+                features_placeholder: test_set_data, labels_placeholder: test_set_labels})
             while True:
                 try:
-                    temp_acc, acc_summary_str = sess.run(
-                        [validation_accuracy, acc_summary]
-                    )
-                    summary_writer_validation.add_summary(
-                        acc_summary_str, epoch * num_test_batches + batch_counter
-                    )
-                    accuracies.append(temp_acc)
-                    batch_counter += 1
+                    acc, acc_summary_str = sess.run(
+                        [acc_op, validation_summary])
                 except tf.errors.OutOfRangeError:
                     break
 
-            print(
-                "Validation accuracy after epoch " + str(epoch) + ": ",
-                np.mean(accuracies),
-            )
+            summary_writer_validation.add_summary(acc_summary_str, epoch)
+            print("Validation accuracy after epoch " +
+                  str(epoch) + ": ", acc)
 
         evaluator = accumulate_results(
-            eval_iterator, is_training_placeholder, shallow_nn
-        )
-        sess.run(
-            eval_iterator.initializer,
-            feed_dict={
-                features_placeholder: test_set_data,
-                labels_placeholder: test_set_labels,
-                track_ids_placeholder: test_set_track_ids,
-            },
-        )
+            eval_iterator, is_training_placeholder, nn)
+        sess.run(eval_iterator.initializer, feed_dict={
+                 features_placeholder: test_set_data, labels_placeholder: test_set_labels, track_ids_placeholder: test_set_track_ids})
 
         results = []
 

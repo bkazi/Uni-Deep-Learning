@@ -208,7 +208,7 @@ def temporal_graph(x):
     return tflat
 
 
-def shallow_nn(x, is_training):
+def deep_nn(x, is_training):
     """deep_nn builds the graph for a deep net for classifying music genres.
   Args:
       x: an input tensor with the dimensions (N_examples, 6400), is the number of data points in the spectral space
@@ -218,6 +218,7 @@ def shallow_nn(x, is_training):
         (blues, classical, country, disco, hiphop, jazz, metal, pop, reggae, rock)
     """
     x = tf_melspectogram(x)
+    img_summary = tf.summary.image('Input_images', x)
 
     freq = frequency_graph(x)
     temp = temporal_graph(x)
@@ -253,4 +254,4 @@ def shallow_nn(x, is_training):
 
     y = fc2
 
-    return y
+    return y, img_summary
