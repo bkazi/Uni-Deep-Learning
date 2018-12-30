@@ -31,8 +31,8 @@ def shallow_nn(x, is_training):
             strides=(1, 1),
             padding="same",
             activation=activation_func,
-            kernel_initializer=tf.contrib.layers.xavier_initializer(),
-            bias_initializer=tf.contrib.layers.xavier_initializer(),
+            kernel_initializer=tf.initializers.truncated_normal(stddev=0.1),
+            bias_initializer=tf.initializers.constant(0.1),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             name='fconv'
@@ -54,8 +54,8 @@ def shallow_nn(x, is_training):
             strides=(1, 1),
             padding="same",
             activation=activation_func,
-            kernel_initializer=tf.contrib.layers.xavier_initializer(),
-            bias_initializer=tf.contrib.layers.xavier_initializer(),
+            kernel_initializer=tf.initializers.truncated_normal(stddev=0.1),
+            bias_initializer=tf.initializers.constant(0.1),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             name='tconv'
@@ -80,9 +80,9 @@ def shallow_nn(x, is_training):
         fc1 = tf.layers.dense(
             inputs=drop,
             units=200,
-            activation=activation_func,
-            kernel_initializer=tf.contrib.layers.xavier_initializer(),
-            bias_initializer=tf.contrib.layers.xavier_initializer(),
+            activation=None,
+            kernel_initializer=tf.initializers.truncated_normal(stddev=0.1),
+            bias_initializer=tf.initializers.constant(0.1),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             name='fc1'
@@ -90,8 +90,8 @@ def shallow_nn(x, is_training):
         fc2 = tf.layers.dense(
             inputs=fc1,
             units=FLAGS.num_classes,
-            kernel_initializer=tf.contrib.layers.xavier_initializer(),
-            bias_initializer=tf.contrib.layers.xavier_initializer(),
+            kernel_initializer=tf.initializers.truncated_normal(stddev=0.1),
+            bias_initializer=tf.initializers.constant(0.1),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             activation=None,
