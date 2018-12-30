@@ -49,7 +49,7 @@ tf.app.flags.DEFINE_string(
 
 
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_e_{epochs}_{network}_augment_{augment}'.format(
-    epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep'), augment=FLAGS.augment)
+    epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep', augment=FLAGS.augment))
 
 
 def model(iterator, is_training, nn):
@@ -193,7 +193,7 @@ def main(_):
             while True:
                 try:
                     _, summary_str = sess.run([optimiser, training_summary], feed_dict={
-                                              is_training_placeholder: True})
+                        is_training_placeholder: True})
                 except tf.errors.OutOfRangeError:
                     break
 
