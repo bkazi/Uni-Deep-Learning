@@ -9,14 +9,8 @@ FLAGS = tf.app.flags.FLAGS
 
 
 def np_softmax(w):
-    # print("w")
-    # print(w)
     e = np.exp(np.array(w) - np.max(w))
-    # print("e")
-    # print(e)
     dist = e / np.sum(e)
-    # print("dist")
-    # print(dist)
     return dist
 
 
@@ -51,22 +45,24 @@ def evaluate(results):
     majority_vote = []
 
     for track_id in track_xs:
-        truths = track_ys[track_id]
-        truth = truths[0]
-        softmaxs = track_y_outs[track_id]
-        predictions = map(lambda x: np.eye(FLAGS.num_classes)
-                          [np.argmax(x)], softmaxs)
-        corrects = np.argmax(predictions, axis=1) == np.argmax(truths, axis=1)
+        track_truths = track_ys[track_id]
+        track_truth = track_truths[0]
+        track_probabilities = track_y_outs[track_id]
 
-        raw_probability.extend(corrects.astype(int))
+        track_raw_probability = map(lambda x: np.eye(FLAGS.num_classes)
+                                    [np.argmax(x)], track_probabilities)
+        raw_probability.extend(
+            (np.argmax(track_raw_probability, axis=1) == np.argmax(track_truths, axis=1)).astype(int))
 
-        track_softmax = np_softmax(
-            reduce((lambda x, y: np.add(x, y)), softmaxs))
+        track_maximum_probability = np.eye(FLAGS.num_classes)[
+            np.argmax(
+                reduce((lambda x, y: np.add(x, y)), track_probabilities))]
         maximum_probability.append(int(np.array_equal(
-            truth, np.eye(FLAGS.num_classes)[np.argmax(track_softmax)])))
+            track_truth, track_maximum_probability)))
 
-        track_prediction = np.eye(FLAGS.num_classes)[np.argmax(
-            reduce((lambda x, y: np.add(x, y)), predictions))]
-        majority_vote.append(int(np.array_equal(truth, track_prediction)))
+        track_majority_vote = np.eye(FLAGS.num_classes)[np.argmax(
+            reduce((lambda x, y: np.add(x, y)), track_raw_probability))]
+        majority_vote.append(
+            int(np.array_equal(track_truth, track_majority_vote)))
 
     return (np.mean(raw_probability), np.mean(maximum_probability), np.mean(majority_vote))
