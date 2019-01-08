@@ -8,9 +8,15 @@ FLAGS = tf.app.flags.FLAGS
 '''
 
 
-def np_softmax(w, t=1.0):
-    e = np.exp(np.array(w) / t)
+def np_softmax(w):
+    # print("w")
+    # print(w)
+    e = np.exp(np.array(w) - np.max(w))
+    # print("e")
+    # print(e)
     dist = e / np.sum(e)
+    # print("dist")
+    # print(dist)
     return dist
 
 
@@ -25,7 +31,7 @@ def f_extend(list1, list2):
     return newlist
 
 
-def split_by_track(results):
+def evaluate(results):
     track_xs = {}
     track_ys = {}
     track_y_outs = {}
@@ -39,12 +45,6 @@ def split_by_track(results):
         track_xs[i] = f_extend(track_xs.get(i, []), [x])
         track_ys[i] = f_extend(track_ys.get(i, []), [y])
         track_y_outs[i] = f_extend(track_y_outs.get(i, []), [y_out])
-
-    return (track_xs, track_xs, track_y_outs)
-
-
-def evaluate(results):
-    (track_xs, track_ys, track_y_outs) = split_by_track(results)
 
     raw_probability = []
     maximum_probability = []
