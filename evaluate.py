@@ -6,51 +6,67 @@ FLAGS = tf.app.flags.FLAGS
 '''
     Softmax for just numpy
 '''
-def np_softmax(w, t = 1.0):
+
+
+def np_softmax(w, t=1.0):
     e = np.exp(np.array(w) / t)
     dist = e / np.sum(e)
     return dist
 
+
 '''
     Functional list extend - WHY DO LANGUAGES INSIST ON MUTATION
 '''
+
+
 def f_extend(list1, list2):
     newlist = list(list1)
     newlist.extend(list2)
     return newlist
 
+
+def split_by_track(results):
+    track_xs = {}
+    track_ys = {}
+    track_y_outs = {}
+
+    for result in results:
+        x = result[0].flatten()
+        y = result[1].flatten()
+        y_out = np_softmax(result[2].flatten())
+        i = result[3][0]
+
+        track_xs[i] = f_extend(track_xs.get(i, []), [x])
+        track_ys[i] = f_extend(track_ys.get(i, []), [y])
+        track_y_outs[i] = f_extend(track_y_outs.get(i, []), [y_out])
+
+    return (track_xs, track_xs, track_y_outs)
+
+
 def evaluate(results):
+    (track_xs, track_ys, track_y_outs) = split_by_track(results)
+
     raw_probability = []
     maximum_probability = []
     majority_vote = []
 
-    track_truth = {}
-    track_softmaxs = {}
-    track_predictions = {}
+    for track_id in track_xs:
+        truths = track_ys[track_id]
+        truth = truths[0]
+        softmaxs = track_y_outs[track_id]
+        predictions = map(lambda x: np.eye(FLAGS.num_classes)
+                          [np.argmax(x)], softmaxs)
+        corrects = np.argmax(predictions, axis=1) == np.argmax(truths, axis=1)
 
-    for result in results:
-        y = result[1].flatten()
-        y_out = result[2].flatten()
-        y_out_prediction = np.eye(FLAGS.num_classes)[np.argmax(y_out)]
-        y_out_softmax = np_softmax(y_out)
-        i = result[3][0]
+        raw_probability.extend(corrects.astype(int))
 
-        track_truth[i] = y
-        track_softmaxs[i] = f_extend(track_softmaxs.get(i, []), [y_out_softmax]) # Bug here sometimes plus wants to be numeric
-        track_predictions[i] = f_extend(track_predictions.get(i, []), [y_out_prediction])
+        track_softmax = np_softmax(
+            reduce((lambda x, y: np.add(x, y)), softmaxs))
+        maximum_probability.append(int(np.array_equal(
+            truth, np.eye(FLAGS.num_classes)[np.argmax(track_softmax)])))
 
-        raw_probability.append(int(np.array_equal(y, y_out_prediction)))
-
-    for i in track_truth:
-        truth = track_truth[i]
-        softmaxs = track_softmaxs[i]
-        predictions = track_predictions[i]
-
-        track_softmax = np_softmax(reduce((lambda x, y: np.add(x, y)), softmaxs))
-        maximum_probability.append(int(np.array_equal(truth, np.eye(FLAGS.num_classes)[np.argmax(track_softmax)])))
-
-        track_prediction = np.eye(FLAGS.num_classes)[np.argmax(reduce((lambda x, y: np.add(x, y)), predictions))]
+        track_prediction = np.eye(FLAGS.num_classes)[np.argmax(
+            reduce((lambda x, y: np.add(x, y)), predictions))]
         majority_vote.append(int(np.array_equal(truth, track_prediction)))
-        
+
     return (np.mean(raw_probability), np.mean(maximum_probability), np.mean(majority_vote))
-    
