@@ -6,11 +6,12 @@ import os
 
 import numpy as np
 import tensorflow as tf
-
 from evaluate import evaluate
 from utils import get_data, tf_melspectogram
 from shallow_nn import shallow_nn
 from deep_nn import deep_nn
+from shallow_nn_improve import shallow_nn as shallow_nn_improve
+from deep_nn_improve import deep_nn as deep_nn_improve
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -18,12 +19,14 @@ tf.app.flags.DEFINE_integer('epochs', 100,
                             'Number of mini-batches to train on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('network', 0,
                             'Type of network to use, 0 for shallow, 1 for deep. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('bn', 0,
-                            'Turn batch norm on or off, 0 for off, 1 for improvements on. (default: %(default)d)')
+tf.app.flags.DEFINE_integer('improve', 0,
+                            'Turn improvements on or off, 0 for off, 1 for improvements on. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('decay', 0,
                             'Turn decaying learning rate on or off. (default: %(default)d')
 tf.app.flags.DEFINE_integer('log_frequency', 100,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
+tf.app.flags.DEFINE_integer('augment', 0,
+                            'Use augmentation, 0 for off, 1 for on (default: %(default)d)')
 tf.app.flags.DEFINE_integer('num_parallel_calls', 1,
                             'Number of cpu cores to use to preprocess data')
 tf.app.flags.DEFINE_integer('save_model', 1000,
@@ -35,19 +38,24 @@ tf.app.flags.DEFINE_integer(
 tf.app.flags.DEFINE_float(
     'learning_rate', 5e-5, 'Learning rate (default: %(default)d)')
 tf.app.flags.DEFINE_integer(
-    'input_width', 80, 'Input width (default: %(default)d)')
+    "input_width", 80, "Input width (default: %(default)d)")
 tf.app.flags.DEFINE_integer(
-    'input_height', 80, 'Input height (default: %(default)d)')
+    "input_height", 80, "Input height (default: %(default)d)")
 tf.app.flags.DEFINE_integer(
-    'input_channels', 1, 'Input channels (default: %(default)d)')
+    "input_channels", 1, "Input channels (default: %(default)d)"
+)
 tf.app.flags.DEFINE_integer(
-    'num_classes', 10, 'Number of classes (default: %(default)d)')
-tf.app.flags.DEFINE_string('log_dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
-                           'Directory where to write event logs and checkpoint. (default: %(default)s)')
+    "num_classes", 10, "Number of classes (default: %(default)d)"
+)
+tf.app.flags.DEFINE_string(
+    "log_dir",
+    "{cwd}/logs/".format(cwd=os.getcwd()),
+    "Directory where to write event logs and checkpoint. (default: %(default)s)",
+)
 
 
-run_log_dir = os.path.join(FLAGS.log_dir, 'exp_lr_{learning_rate}_decay_{decay}_bs_{batch_size}_e_{epochs}_{network}_bn_{bn}'.format(
-    learning_rate=FLAGS.learning_rate, decay={FLAGS.decay}, batch_size=FLAGS.batch_size, epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep', bn=FLAGS.bn))
+run_log_dir = os.path.join(FLAGS.log_dir, 'exp_lr_{learning_rate}_decay_{decay}_bs_{batch_size}_e_{epochs}_{network}_improve_{improve}_augment_{augment}'.format(
+    learning_rate=FLAGS.learning_rate, decay={FLAGS.decay}, batch_size=FLAGS.batch_size, epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep', improve=FLAGS.improve, augment=FLAGS.augment))
 
 
 def model(iterator, is_training, nn):
@@ -57,13 +65,16 @@ def model(iterator, is_training, nn):
         y_out, img_summary = nn(next_x, is_training)
 
     # Compute categorical loss
-    with tf.variable_scope('cross_entropy'):
+    with tf.variable_scope("cross_entropy"):
         cross_entropy = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits_v2(labels=next_y, logits=y_out))
+            tf.nn.softmax_cross_entropy_with_logits_v2(
+                labels=next_y, logits=y_out)
+        )
 
     # L1 regularise
     regularization_penalty = tf.losses.get_regularization_loss(
-        name='total_regularization_loss')
+        name="total_regularization_loss"
+    )
     regularized_loss = cross_entropy + regularization_penalty
 
     return regularized_loss, img_summary
@@ -97,35 +108,60 @@ def _preprocess(features, label):
 
 def main(_):
 
-    (train_set_data, train_set_labels, _, test_set_data,
-     test_set_labels, test_set_track_ids) = get_data()
+    (
+        train_set_data,
+        train_set_labels,
+        _,
+        test_set_data,
+        test_set_labels,
+        test_set_track_ids,
+    ) = get_data()
 
     is_training_placeholder = tf.placeholder_with_default(False, shape=())
 
     features_placeholder = tf.placeholder(
-        tf.float32, (None, np.shape(train_set_data)[1]))
-    labels_placeholder = tf.placeholder(
-        tf.uint8, (None))
+        tf.float32, (None, np.shape(train_set_data)[1])
+    )
+    labels_placeholder = tf.placeholder(tf.uint8, (None))
     track_ids_placeholder = tf.placeholder(tf.uint8, (None))
 
+    shuffle_buffer_size = 1000 if (FLAGS.augment == 0) else 30000
     dataset = tf.data.Dataset.from_tensor_slices(
-        (features_placeholder, labels_placeholder))
-    dataset = dataset.shuffle(buffer_size=1000)
-    dataset = dataset.map(_preprocess)
-    dataset = dataset.batch(FLAGS.batch_size)
-    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
+        (features_placeholder, labels_placeholder)
+    )
+    dataset = dataset.shuffle(buffer_size=shuffle_buffer_size)
+    dataset = dataset.apply(
+        tf.data.experimental.map_and_batch(
+            _preprocess, FLAGS.batch_size, num_parallel_calls=FLAGS.num_parallel_calls)
+    )
+    dataset = dataset.prefetch(1)
 
     train_iterator = dataset.make_initializable_iterator()
     test_iterator = dataset.make_initializable_iterator()
 
     eval_dataset = tf.data.Dataset.from_tensor_slices(
-        (features_placeholder, labels_placeholder, track_ids_placeholder))
-    eval_dataset = eval_dataset.map(lambda features, label, track_id: (
-        features, tf.one_hot(indices=label, depth=FLAGS.num_classes, dtype=tf.uint8), track_id))
+        (features_placeholder, labels_placeholder, track_ids_placeholder)
+    )
+    eval_dataset = eval_dataset.map(
+        lambda features, label, track_id: (
+            features,
+            tf.one_hot(indices=label, depth=FLAGS.num_classes, dtype=tf.uint8),
+            track_id,
+        )
+    )
     eval_dataset = eval_dataset.batch(1)
     eval_iterator = eval_dataset.make_initializable_iterator()
 
-    nn = shallow_nn if (FLAGS.network == 0) else deep_nn
+    if (FLAGS.network == 0):
+        if (FLAGS.improve == 0):
+            nn = shallow_nn
+        else:
+            nn = shallow_nn_improve
+    else:
+        if (FLAGS.improve == 0):
+            nn = deep_nn
+        else:
+            nn = deep_nn_improve
 
     loss, img_summary = model(
         train_iterator, is_training_placeholder, nn)
@@ -146,8 +182,8 @@ def main(_):
     validation_accuracy, acc_op = calc_accuracy(
         test_iterator, is_training_placeholder, nn)
 
-    loss_summary = tf.summary.scalar('Loss', loss)
-    acc_summary = tf.summary.scalar('Accuracy', validation_accuracy)
+    loss_summary = tf.summary.scalar("Loss", loss)
+    acc_summary = tf.summary.scalar("Accuracy", validation_accuracy)
 
     training_summary = tf.summary.merge([img_summary, loss_summary])
     validation_summary = tf.summary.merge([acc_summary])
@@ -163,9 +199,10 @@ def main(_):
     with tf.Session() as sess:
 
         summary_writer = tf.summary.FileWriter(
-            run_log_dir + '_train', sess.graph)
+            run_log_dir + "_train", sess.graph)
         summary_writer_validation = tf.summary.FileWriter(
-            run_log_dir + '_validate', sess.graph)
+            run_log_dir + "_validate", sess.graph
+        )
 
         sess.run(tf.global_variables_initializer())
 
@@ -178,7 +215,7 @@ def main(_):
             while True:
                 try:
                     _, summary_str = sess.run([optimiser, training_summary], feed_dict={
-                                              is_training_placeholder: True})
+                        is_training_placeholder: True})
                 except tf.errors.OutOfRangeError:
                     break
 
@@ -214,10 +251,11 @@ def main(_):
         raw_probability, maximum_probability, majority_vote = evaluate(results)
 
         print("-----===== Summary =====-----")
-        print("Raw Probability: ", raw_probability)
-        print("Maximum Probability: ", maximum_probability)
-        print("Majority Vote: ", majority_vote)
+        print("Raw Probability: {:.2f}%".format(raw_probability * 100.0))
+        print("Maximum Probability: {:.2f}%".format(
+            maximum_probability * 100.0))
+        print("Majority Vote: {:.2f}%".format(majority_vote * 100))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     tf.app.run(main=main)

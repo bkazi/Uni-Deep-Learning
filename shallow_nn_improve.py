@@ -31,12 +31,14 @@ def shallow_nn(x, is_training):
             strides=(1, 1),
             padding="same",
             activation=activation_func,
-            kernel_initializer=tf.initializers.truncated_normal(stddev=0.1),
-            bias_initializer=tf.initializers.constant(0.1),
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             name='fconv'
         )
+        fconv = activation_func(
+            tf.layers.batch_normalization(fconv, training=is_training))
         fpool = tf.layers.max_pooling2d(
             inputs=fconv,
             pool_size=[1, 20],
@@ -54,12 +56,14 @@ def shallow_nn(x, is_training):
             strides=(1, 1),
             padding="same",
             activation=activation_func,
-            kernel_initializer=tf.initializers.truncated_normal(stddev=0.1),
-            bias_initializer=tf.initializers.constant(0.1),
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             name='tconv'
         )
+        tconv = activation_func(
+            tf.layers.batch_normalization(tconv, training=is_training))
         tpool = tf.layers.max_pooling2d(
             inputs=tconv,
             pool_size=[20, 1],
@@ -81,8 +85,8 @@ def shallow_nn(x, is_training):
             inputs=drop,
             units=200,
             activation=activation_func,
-            kernel_initializer=tf.initializers.truncated_normal(stddev=0.1),
-            bias_initializer=tf.initializers.constant(0.1),
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             name='fc1'
@@ -90,8 +94,8 @@ def shallow_nn(x, is_training):
         fc2 = tf.layers.dense(
             inputs=fc1,
             units=FLAGS.num_classes,
-            kernel_initializer=tf.initializers.truncated_normal(stddev=0.1),
-            bias_initializer=tf.initializers.constant(0.1),
+            kernel_initializer=tf.contrib.layers.xavier_initializer(),
+            bias_initializer=tf.contrib.layers.xavier_initializer(),
             kernel_regularizer=l1_regularizer,
             bias_regularizer=l1_regularizer,
             activation=None,
