@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import time
 
 import numpy as np
 import tensorflow as tf
@@ -21,8 +22,8 @@ tf.app.flags.DEFINE_integer('network', 0,
                             'Type of network to use, 0 for shallow, 1 for deep. (default: %(default)d)')
 tf.app.flags.DEFINE_integer('improve', 0,
                             'Turn improvements on or off, 0 for off, 1 for improvements on. (default: %(default)d)')
-tf.app.flags.DEFINE_integer('decay', 0,
-                            'Turn decaying learning rate on or off. (default: %(default)d')
+tf.app.flags.DEFINE_float('decay', 0,
+                          'Amount to decay learning rate. Greater than 0 enables decaying (default: %(default)d')
 tf.app.flags.DEFINE_integer('log_frequency', 100,
                             'Number of steps between logging results to the console and saving summaries (default: %(default)d)')
 tf.app.flags.DEFINE_integer('augment', 0,
@@ -55,7 +56,7 @@ tf.app.flags.DEFINE_string(
 
 
 run_log_dir = os.path.join(FLAGS.log_dir, 'exp_lr_{learning_rate}_decay_{decay}_bs_{batch_size}_e_{epochs}_{network}_improve_{improve}_augment_{augment}'.format(
-    learning_rate=FLAGS.learning_rate, decay={FLAGS.decay}, batch_size=FLAGS.batch_size, epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep', improve=FLAGS.improve, augment=FLAGS.augment))
+    learning_rate=FLAGS.learning_rate, decay=FLAGS.decay, batch_size=FLAGS.batch_size, epochs=FLAGS.epochs, network='shallow' if (FLAGS.network == 0) else 'deep', improve=FLAGS.improve, augment=FLAGS.augment))
 
 
 def model(iterator, is_training, nn):
@@ -77,7 +78,10 @@ def model(iterator, is_training, nn):
     )
     regularized_loss = cross_entropy + regularization_penalty
 
-    return regularized_loss, img_summary
+    accuracy, accuracy_op = tf.metrics.accuracy(
+        tf.argmax(next_y, axis=1), tf.argmax(y_out, axis=1), name="accuracy_train")
+
+    return regularized_loss, img_summary, accuracy, accuracy_op
 
 
 def calc_accuracy(iterator, is_training, nn):
@@ -87,7 +91,7 @@ def calc_accuracy(iterator, is_training, nn):
         y_out, _ = nn(next_x, is_training)
 
     accuracy, accuracy_op = tf.metrics.accuracy(
-        tf.argmax(next_y, axis=1), tf.argmax(y_out, axis=1), name="accuracy")
+        tf.argmax(next_y, axis=1), tf.argmax(y_out, axis=1), name="accuracy_test")
 
     return accuracy, accuracy_op
 
@@ -117,6 +121,9 @@ def main(_):
         test_set_track_ids,
     ) = get_data()
 
+    print("Making TF graph")
+    start = time.time()
+
     is_training_placeholder = tf.placeholder_with_default(False, shape=())
 
     features_placeholder = tf.placeholder(
@@ -125,7 +132,7 @@ def main(_):
     labels_placeholder = tf.placeholder(tf.uint8, (None))
     track_ids_placeholder = tf.placeholder(tf.uint8, (None))
 
-    shuffle_buffer_size = 1000 if (FLAGS.augment == 0) else 30000
+    shuffle_buffer_size = len(train_set_data)
     dataset = tf.data.Dataset.from_tensor_slices(
         (features_placeholder, labels_placeholder)
     )
@@ -154,22 +161,26 @@ def main(_):
 
     if (FLAGS.network == 0):
         if (FLAGS.improve == 0):
+            print("Using Shallow network")
             nn = shallow_nn
         else:
+            print("Using Shallow Improved network")
             nn = shallow_nn_improve
     else:
         if (FLAGS.improve == 0):
+            print("Using Deep Network")
             nn = deep_nn
         else:
+            print("Using Deep Improved Network")
             nn = deep_nn_improve
 
-    loss, img_summary = model(
+    loss, _, train_acc, train_acc_op = model(
         train_iterator, is_training_placeholder, nn)
 
     global_step = tf.Variable(0, trainable=False)
-    if (FLAGS.decay):
+    if (FLAGS.decay > 0):
         learning_rate = tf.train.exponential_decay(
-            FLAGS.learning_rate, global_step, 1000, 1e-5)
+            FLAGS.learning_rate, global_step, 15000, FLAGS.decay)
     else:
         learning_rate = FLAGS.learning_rate
     # Adam Optimiser
@@ -182,21 +193,34 @@ def main(_):
     validation_accuracy, acc_op = calc_accuracy(
         test_iterator, is_training_placeholder, nn)
 
+    evaluator = accumulate_results(
+        eval_iterator, is_training_placeholder, nn)
+
     loss_summary = tf.summary.scalar("Loss", loss)
     acc_summary = tf.summary.scalar("Accuracy", validation_accuracy)
+    train_acc_summary = tf.summary.scalar("Accuracy", train_acc)
 
-    training_summary = tf.summary.merge([img_summary, loss_summary])
+    training_summary = tf.summary.merge([loss_summary, train_acc_summary])
     validation_summary = tf.summary.merge([acc_summary])
 
     # Isolate the variables stored behind the scenes by the metric operation
     running_vars = tf.get_collection(
-        tf.GraphKeys.LOCAL_VARIABLES, scope="accuracy")
+        tf.GraphKeys.LOCAL_VARIABLES, scope="accuracy_test")
+    train_running_vars = tf.get_collection(
+        tf.GraphKeys.LOCAL_VARIABLES, scope="accuracy_train")
 
     # Define initializer to initialize/reset running variables
     running_vars_initializer = tf.variables_initializer(
         var_list=running_vars)
+    train_running_vars_initializer = tf.variables_initializer(
+        var_list=train_running_vars)
+
+    end = time.time()
+    print("Time to prep TF ops: {:.2f}s".format(end - start))
 
     with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        sess.graph.finalize()
 
         summary_writer = tf.summary.FileWriter(
             run_log_dir + "_train", sess.graph)
@@ -204,17 +228,16 @@ def main(_):
             run_log_dir + "_validate", sess.graph
         )
 
-        sess.run(tf.global_variables_initializer())
-
         for epoch in range(FLAGS.epochs):
             sess.run(running_vars_initializer)
+            sess.run(train_running_vars_initializer)
             sess.run(train_iterator.initializer, feed_dict={
                 features_placeholder: train_set_data, labels_placeholder: train_set_labels})
 
             # Run until all samples done
             while True:
                 try:
-                    _, summary_str = sess.run([optimiser, training_summary], feed_dict={
+                    _, acc_train, summary_str = sess.run([optimiser, train_acc_op, training_summary], feed_dict={
                         is_training_placeholder: True})
                 except tf.errors.OutOfRangeError:
                     break
@@ -231,20 +254,20 @@ def main(_):
                     break
 
             summary_writer_validation.add_summary(acc_summary_str, epoch)
-            print("Validation accuracy after epoch " +
-                  str(epoch) + ": ", acc)
+            print("Accuracy after epoch {} - Training: {:.2f}% Validation: {:.2f}%".format(
+                str(epoch), acc_train * 100.0, acc * 100.0))
 
-        evaluator = accumulate_results(
-            eval_iterator, is_training_placeholder, nn)
         sess.run(eval_iterator.initializer, feed_dict={
                  features_placeholder: test_set_data, labels_placeholder: test_set_labels, track_ids_placeholder: test_set_track_ids})
 
-        results = []
+        results = [None] * np.shape(test_set_data)[0]
 
+        count = 0
         while True:
             try:
                 evaluated = sess.run(evaluator)
-                results.append(evaluated)
+                results[count] = evaluated
+                count += 1
             except tf.errors.OutOfRangeError:
                 break
 
