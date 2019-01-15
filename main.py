@@ -32,6 +32,8 @@ tf.app.flags.DEFINE_integer('num_parallel_calls', 1,
                             'Number of cpu cores to use to preprocess data')
 tf.app.flags.DEFINE_integer('save_model', 1000,
                             'Number of steps between model saves (default: %(default)d)')
+tf.app.flags.DEFINE_integer('save_images', 0,
+                            'Whether to save spectrogram images, 0 to not save, 1 to save. (default: %(default)d)')
 
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer(
