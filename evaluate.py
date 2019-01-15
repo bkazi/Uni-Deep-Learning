@@ -123,7 +123,8 @@ def evaluate(results):
         majority_vote.append(
             int(np.array_equal(track_truth, track_majority_vote_prediction)))
 
-        find_interesting(track_id, track_inputs, track_truth, track_raw_probability,
-                         track_maximum_probability, track_majority_vote)
+        if FLAGS.save_images == 1:
+            find_interesting(track_id, track_inputs, track_truth, track_raw_probability,
+                             track_maximum_probability, track_majority_vote)
 
     return (np.mean(raw_probability), np.mean(maximum_probability), np.mean(majority_vote))
