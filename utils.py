@@ -119,6 +119,7 @@ def augmentDataFunc(trainingSetData, trainingSetLabels):
 
 
 def get_data():
+    print("Reading data")
     start = time.time()
     with open("music_genres_dataset.pkl", "rb") as f:
         train_set = pickle.load(f)
