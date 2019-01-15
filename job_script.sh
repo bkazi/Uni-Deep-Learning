@@ -2,7 +2,7 @@
 #SBATCH -t 0-01:00 # Runtime in D-HH:MM
 #SBATCH -p gpu # Partition to submit to
 #SBATCH --gres=gpu:1
-#SBATCH --mem=6G
+#SBATCH --mem=100G
 #SBATCH --account=comsm0018       # use the course account
 #SBATCH -J adl    # name
 #SBATCH -o hostname_%j.out # File to which STDOUT will be written
